@@ -193,6 +193,11 @@ systemctl stop httpd && systemctl disable httpd
 ### Nginx /xingye/ 的 root 配置
 `/xingye/` 和 `/xingye` location 的 root 必须指向 `/opt/xingye/html`，不要指向 `/var/www`。文件在 `/opt/xingye/html/xingye/`。
 
+### Nginx alias vs root 陷阱
+SPA 页面（如 `/reading/`）如果用 `root` + `try_files $uri $uri/ /reading/index.html`，fallback 路径 `/reading/index.html` 会再次匹配到同一个 `location /reading/`，形成 rewrite 循环。正确做法：
+- 用 `alias /opt/xingye/html/reading/;` 替代 `root`
+- `try_files $uri $uri/ =404;`（不要用 URI 作为 fallback）
+
 ---
 
 ## 🛠️ 关键文件路径
