@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心理板块设计方案</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #888;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      min-height: 100vh;
+      padding: 60px 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      font-size: 13px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 60px;
+      font-weight: 400;
+    }
+    .schemes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    .scheme-card {
+      background: #111116;
+      border: 1px solid #1e1e28;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .scheme-card:hover { border-color: #444; }
+    .scheme-preview {
+      height: 280px;
+      overflow: hidden;
+      position: relative;
+    }
+    .scheme-preview iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      transform: scale(0.5);
+      transform-origin: top left;
+      pointer-events: none;
+    }
+    .scheme-info {
+      padding: 20px 24px;
+      border-top: 1px solid #1e1e28;
+    }
+    .scheme-name {
+      font-size: 16px;
+      color: #ccc;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .scheme-desc {
+      font-size: 12px;
+      color: #555;
+      line-height: 1.6;
+    }
+    @media (max-width: 640px) {
+      .schemes { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>心理板块 · 设计方案</h1>
+    <div class="schemes">
+      <a class="scheme-card" href="scheme-1-magazine.html" target="_blank">
+        <div class="scheme-preview">
+          <iframe src="scheme-1-magazine.html"></iframe>
+        </div>
+        <div class="scheme-info">
+          <div class="scheme-name">方案一 · 杂志风</div>
+          <div class="scheme-desc">大留白、衬线字、克制配色、单栏长文感</div>
+        </div>
+      </a>
+      <a class="scheme-card" href="scheme-2-contemplative.html" target="_blank">
+        <div class="scheme-preview">
+          <iframe src="scheme-2-contemplative.html"></iframe>
+        </div>
+        <div class="scheme-info">
+          <div class="scheme-name">方案二 · 沉思风</div>
+          <div class="scheme-desc">深夜书房感、深炭背景、精致引用块、优雅字间距</div>
+        </div>
+      </a>
+      <a class="scheme-card" href="scheme-3-manuscript.html" target="_blank">
+        <div class="scheme-preview">
+          <iframe src="scheme-3-manuscript.html"></iframe>
+        </div>
+        <div class="scheme-info">
+          <div class="scheme-name">方案三 · 手稿风</div>
+          <div class="scheme-desc">极简线框、时间戳在角落、私人日记感、无装饰</div>
+        </div>
+      </a>
+      <a class="scheme-card" href="scheme-4-minimal.html" target="_blank">
+        <div class="scheme-preview">
+          <iframe src="scheme-4-minimal.html"></iframe>
+        </div>
+        <div class="scheme-info">
+          <div class="scheme-name">方案四 · 极简黑</div>
+          <div class="scheme-desc">全黑背景、几何字体、极克制、最高严肃感</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

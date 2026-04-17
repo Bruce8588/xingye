@@ -197,6 +197,7 @@ systemctl stop httpd && systemctl disable httpd
 SPA 页面（如 `/reading/`）如果用 `root` + `try_files $uri $uri/ /reading/index.html`，fallback 路径 `/reading/index.html` 会再次匹配到同一个 `location /reading/`，形成 rewrite 循环。正确做法：
 - 用 `alias /opt/xingye/html/reading/;` 替代 `root`
 - `try_files $uri $uri/ =404;`（不要用 URI 作为 fallback）
+- **注意**：`alias` + `try_files $uri $uri/` 同样会循环（`$uri` 带完整路径前缀，会在 alias 目录下查找不存在路径），fallback 也只能用 `=404`
 
 ---
 

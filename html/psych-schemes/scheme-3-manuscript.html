@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案三 · 手稿风</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #f5f0e8;
+      color: #3a3530;
+      font-family: "Courier New", "Source Han Mono SC", monospace;
+      font-size: 13px;
+      line-height: 2;
+      min-height: 100vh;
+    }
+    .page { max-width: 580px; margin: 0 auto; padding: 80px 20px 120px; }
+    .header { border-bottom: 1px solid #ddd5c5; padding-bottom: 32px; margin-bottom: 0; }
+    .header-title { font-size: 11px; letter-spacing: 6px; color: #aaa; text-transform: uppercase; margin-bottom: 12px; }
+    .header-name { font-size: 20px; color: #2a2520; letter-spacing: 2px; }
+    .header-date { font-size: 11px; color: #bbb; margin-top: 4px; letter-spacing: 1px; }
+    .list-view { display: block; }
+    .list-view.hidden { display: none; }
+    .detail { display: none; }
+    .detail.active { display: block; }
+    .card { padding: 28px 0; border-bottom: 1px solid #e5ddd0; cursor: pointer; position: relative; }
+    .card:hover .card-title { color: #555; }
+    .card-title { font-size: 15px; color: #2a2520; letter-spacing: 1px; margin-bottom: 4px; transition: color 0.2s; }
+    .card-meta { font-size: 11px; color: #ccc; }
+    .card-line { font-size: 12px; color: #888; margin-top: 10px; max-width: 460px; }
+    .back { display: inline-block; font-size: 12px; color: #aaa; text-decoration: none; margin-bottom: 48px; cursor: pointer; border-bottom: 1px solid #ddd; padding-bottom: 2px; }
+    .back:hover { color: #666; border-color: #aaa; }
+    .detail-header { border-bottom: 1px solid #e5ddd0; padding-bottom: 24px; margin-bottom: 40px; }
+    .detail-name { font-size: 18px; color: #2a2520; letter-spacing: 2px; margin-bottom: 4px; }
+    .detail-type { font-size: 11px; color: #bbb; letter-spacing: 2px; }
+    .detail-section { margin-bottom: 36px; }
+    .detail-label { font-size: 11px; color: #ccc; letter-spacing: 2px; margin-bottom: 14px; border-bottom: 1px solid #e5ddd0; padding-bottom: 6px; }
+    .detail-text { font-size: 13px; color: #555; line-height: 2.2; white-space: pre-wrap; }
+    .fab { position: fixed; bottom: 32px; right: 32px; width: 36px; height: 36px; background: #2a2520; color: #f5f0e8; border: none; border-radius: 2px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .fab:hover { background: #1a1510; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="list-view" id="listView">
+      <div class="header">
+        <div class="header-title">// 心影档案</div>
+        <div class="header-name">PSYCHOLOGY</div>
+        <div class="header-date">2024 — 2026</div>
+      </div>
+      <div class="card" onclick="showDetail(0)">
+        <div class="card-title">01  心影一号</div>
+        <div class="card-meta">INTJ</div>
+        <div class="card-line">冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。</div>
+      </div>
+      <div class="card" onclick="showDetail(1)">
+        <div class="card-title">02  高敏感</div>
+        <div class="card-meta">HSP</div>
+        <div class="card-line">对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂。</div>
+      </div>
+      <div class="card" onclick="showDetail(2)">
+        <div class="card-title">03  理性派</div>
+        <div class="card-meta">ESTP</div>
+        <div class="card-line">务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。</div>
+      </div>
+    </div>
+    <div class="detail" id="detailView">
+      <span class="back" onclick="showList()">← 返回</span>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+  <button class="fab">+</button>
+  <script>
+    const data = [
+      { name: '心影一号', type: 'INTJ', traits: '冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。不轻易外露情绪，但内心有强烈的价值判断标准。\n\n擅长抽象分析，能在信息残缺时仍构建出自洽的逻辑框架。对愚蠢缺乏耐心，尤其无法忍受逻辑混乱的讨论。', tools: '第一性原理\n俯视分析法\n逆向思维\n长期主义' },
+      { name: '高敏感', type: 'HSP', traits: '对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂，共情能力极强，但也容易受到外部情绪的干扰。\n\n在安静的环境中创造力最强，嘈杂会使其迅速耗能。习惯深度独处，从内省中获取能量。', tools: '情绪记录法\n场景切换\n边界建立' },
+      { name: '理性派', type: 'ESTP', traits: '务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。对风险有敏锐嗅觉。\n\n不惧怕冲突，甚至在冲突中能保持异常清醒。社交能力强，能够快速与陌生人建立联系。', tools: '成本收益分析\n压力测试\n快速迭代' }
+    ];
+    function showDetail(idx) {
+      const d = data[idx];
+      document.getElementById('detailContent').innerHTML = '<div class="detail-header"><div class="detail-name">'+d.name+'</div><div class="detail-type">'+d.type+'</div></div><div class="detail-section"><div class="detail-label">特质</div><div class="detail-text">'+d.traits+'</div></div><div class="detail-section"><div class="detail-label">工具</div><div class="detail-text">'+d.tools+'</div></div>';
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('detailView').classList.add('active');
+      window.scrollTo(0,0);
+    }
+    function showList() {
+      document.getElementById('listView').classList.remove('hidden');
+      document.getElementById('detailView').classList.remove('active');
+    }
+  </script>
+</body>
+</html>

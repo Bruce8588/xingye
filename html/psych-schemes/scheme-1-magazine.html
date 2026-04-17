@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案一 · 杂志风</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #FAF8F5;
+      color: #2c2c2c;
+      font-family: "Noto Sans SC", sans-serif;
+      font-weight: 300;
+      line-height: 1.9;
+      min-height: 100vh;
+    }
+    .page { max-width: 680px; margin: 0 auto; padding: 80px 24px 120px; }
+    .header { margin-bottom: 80px; }
+    .header-label {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #aaa;
+      margin-bottom: 24px;
+    }
+    .header-title {
+      font-family: "Noto Serif SC", serif;
+      font-size: 42px;
+      font-weight: 300;
+      color: #1a1a1a;
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .header-sub {
+      font-size: 14px;
+      color: #999;
+    }
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: #ccc;
+      margin: 60px 0;
+    }
+    .card {
+      padding: 48px 0;
+      border-bottom: 1px solid #e8e4df;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .card:last-child { border-bottom: none; }
+    .card:hover { opacity: 0.7; }
+    .card-name {
+      font-family: "Noto Serif SC", serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+    .card-meta {
+      font-size: 12px;
+      color: #bbb;
+      margin-bottom: 24px;
+      letter-spacing: 1px;
+    }
+    .card-excerpt {
+      font-size: 15px;
+      color: #666;
+      line-height: 2;
+      max-width: 540px;
+    }
+    /* detail view */
+    .detail { display: none; padding-top: 20px; }
+    .detail.active { display: block; }
+    .list-view { display: block; }
+    .list-view.hidden { display: none; }
+    .back-link {
+      display: inline-block;
+      font-size: 13px;
+      color: #aaa;
+      text-decoration: none;
+      margin-bottom: 60px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: #666; }
+    .detail-name {
+      font-family: "Noto Serif SC", serif;
+      font-size: 52px;
+      font-weight: 300;
+      color: #1a1a1a;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .detail-meta {
+      font-size: 12px;
+      color: #bbb;
+      letter-spacing: 2px;
+      margin-bottom: 56px;
+    }
+    .detail-section { margin-bottom: 48px; }
+    .detail-section-title {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ccc;
+      margin-bottom: 20px;
+      font-family: "Noto Sans SC", sans-serif;
+      font-weight: 400;
+    }
+    .detail-text {
+      font-family: "Noto Serif SC", serif;
+      font-size: 17px;
+      font-weight: 300;
+      color: #3a3a3a;
+      line-height: 2.2;
+    }
+    .fab {
+      position: fixed;
+      bottom: 40px;
+      right: 40px;
+      width: 48px;
+      height: 48px;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .fab:hover { background: #444; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- List View -->
+    <div class="list-view" id="listView">
+      <div class="header">
+        <div class="header-label">Psychology</div>
+        <h1 class="header-title">心影档案</h1>
+        <p class="header-sub">记录人格特质与思维工具</p>
+      </div>
+      <div class="divider"></div>
+
+      <div class="card" onclick="showDetail(0)">
+        <div class="card-name">心影一号</div>
+        <div class="card-meta">INTJ · 2024.03.12</div>
+        <p class="card-excerpt">冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。不轻易外露情绪，但内心有强烈的价值判断标准。</p>
+      </div>
+
+      <div class="card" onclick="showDetail(1)">
+        <div class="card-name">高敏感</div>
+        <div class="card-meta">HSP · 2024.08.05</div>
+        <p class="card-excerpt">对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂，共情能力极强，但也容易受到外部情绪的干扰。</p>
+      </div>
+
+      <div class="card" onclick="showDetail(2)">
+        <div class="card-name">理性派</div>
+        <div class="card-meta">ESTP · 2025.01.20</div>
+        <p class="card-excerpt">务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。对风险有敏锐嗅觉。</p>
+      </div>
+    </div>
+
+    <!-- Detail View -->
+    <div class="detail" id="detailView">
+      <span class="back-link" onclick="showList()">← 返回</span>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <button class="fab">+</button>
+
+  <script>
+    const data = [
+      {
+        name: '心影一号',
+        type: 'INTJ',
+        date: '2024.03.12',
+        traits: '冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。不轻易外露情绪，但内心有强烈的价值判断标准。\n\n擅长抽象分析，能在信息残缺时仍构建出自洽的逻辑框架。对愚蠢缺乏耐心，尤其无法忍受逻辑混乱的讨论。自我要求极高，并同样以这种标准审视外部世界。',
+        tools: '第一性原理：追问本质，而非表象\n俯视分析：从系统外部审视结构\n逆向思维：从终点倒推路径\n长期主义：抵制短期诱惑'
+      },
+      {
+        name: '高敏感',
+        type: 'HSP',
+        date: '2024.08.05',
+        traits: '对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂，共情能力极强，但也容易受到外部情绪的干扰。\n\n在安静的环境中创造力最强，嘈杂会使其迅速耗能。习惯深度独处，从内省中获取能量而非消耗。对不真诚的人际交往有本能的排斥。',
+        tools: '情绪记录：将模糊的感受文字化\n场景切换：物理隔离耗能环境\n边界建立：明确拒绝超载请求'
+      },
+      {
+        name: '理性派',
+        type: 'ESTP',
+        date: '2025.01.20',
+        traits: '务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。对风险有敏锐嗅觉。\n\n不惧怕冲突，甚至在冲突中能保持异常清醒。社交能力强，能够快速与陌生人建立联系。倾向于用行动而非语言表达。',
+        tools: '成本收益分析：快速权衡利弊\n压力测试：预设最坏情况\n快速迭代：小步试错而非大规划'
+      }
+    ];
+
+    function showDetail(idx) {
+      const d = data[idx];
+      document.getElementById('detailContent').innerHTML = `
+        <div class="detail-name">${d.name}</div>
+        <div class="detail-meta">${d.type} · ${d.date}</div>
+        <div class="detail-section">
+          <div class="detail-section-title">特质</div>
+          <div class="detail-text">${d.traits.replace(/\n/g, '<br>')}</div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-section-title">工具</div>
+          <div class="detail-text">${d.tools.replace(/\n/g, '<br>')}</div>
+        </div>
+      `;
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('detailView').classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function showList() {
+      document.getElementById('listView').classList.remove('hidden');
+      document.getElementById('detailView').classList.remove('active');
+    }
+  </script>
+</body>
+</html>

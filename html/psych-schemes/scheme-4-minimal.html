@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案四 · 极简黑</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #555;
+      font-family: "Helvetica Neue", "PingFang SC", sans-serif;
+      font-weight: 200;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      min-height: 100vh;
+    }
+    .page { max-width: 520px; margin: 0 auto; padding: 120px 40px 140px; }
+    .header { margin-bottom: 100px; }
+    .header-title {
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: #333;
+      margin-bottom: 24px;
+    }
+    .header-main {
+      font-size: 48px;
+      font-weight: 200;
+      color: #fff;
+      letter-spacing: -1px;
+      line-height: 1.1;
+    }
+    .list-view { display: block; }
+    .list-view.hidden { display: none; }
+    .detail { display: none; }
+    .detail.active { display: block; }
+    .item {
+      border-top: 1px solid #111;
+      padding: 40px 0;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      transition: background 0.15s;
+    }
+    .item:hover .item-name { color: #bbb; }
+    .item:hover .item-arrow { color: #444; }
+    .item-name { font-size: 16px; font-weight: 300; color: #888; letter-spacing: 1px; transition: color 0.2s; }
+    .item-type { font-size: 10px; color: #333; letter-spacing: 3px; margin-top: 6px; text-transform: uppercase; }
+    .item-line { font-size: 12px; color: #333; margin-top: 12px; max-width: 340px; line-height: 1.8; }
+    .item-arrow { font-size: 14px; color: #222; transition: color 0.2s; flex-shrink: 0; margin-left: 20px; }
+    .back { display: inline-block; font-size: 11px; color: #333; cursor: pointer; margin-bottom: 80px; letter-spacing: 2px; }
+    .back:hover { color: #666; }
+    .detail-name { font-size: 64px; font-weight: 200; color: #fff; letter-spacing: -2px; line-height: 1; margin-bottom: 6px; }
+    .detail-type { font-size: 10px; color: #333; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 80px; }
+    .detail-section { margin-bottom: 60px; }
+    .detail-label { font-size: 10px; color: #222; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
+    .detail-text { font-size: 13px; color: #555; line-height: 2.4; white-space: pre-wrap; }
+    .fab { position: fixed; bottom: 40px; right: 40px; width: 40px; height: 40px; background: #fff; color: #000; border: none; font-size: 22px; font-weight: 200; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .fab:hover { background: #eee; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="list-view" id="listView">
+      <div class="header">
+        <div class="header-title">Psychology /</div>
+        <div class="header-main">心影<br>档案</div>
+      </div>
+      <div class="item" onclick="showDetail(0)">
+        <div>
+          <div class="item-name">心影一号</div>
+          <div class="item-type">INTJ</div>
+          <div class="item-line">冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。</div>
+        </div>
+        <div class="item-arrow">→</div>
+      </div>
+      <div class="item" onclick="showDetail(1)">
+        <div>
+          <div class="item-name">高敏感</div>
+          <div class="item-type">HSP</div>
+          <div class="item-line">对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂，共情能力极强。</div>
+        </div>
+        <div class="item-arrow">→</div>
+      </div>
+      <div class="item" onclick="showDetail(2)">
+        <div>
+          <div class="item-name">理性派</div>
+          <div class="item-type">ESTP</div>
+          <div class="item-line">务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。</div>
+        </div>
+        <div class="item-arrow">→</div>
+      </div>
+    </div>
+    <div class="detail" id="detailView">
+      <span class="back" onclick="showList()">← BACK</span>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+  <button class="fab">+</button>
+  <script>
+    const data = [
+      { name: '心影一号', type: 'INTJ', traits: '冷静理性，善于从宏观构建体系。习惯用战略视角审视问题，对效率有近乎苛刻的追求。不轻易外露情绪，但内心有强烈的价值判断标准。\n\n擅长抽象分析，能在信息残缺时仍构建出自洽的逻辑框架。对愚蠢缺乏耐心，尤其无法忍受逻辑混乱的讨论。', tools: '第一性原理\n俯视分析法\n逆向思维\n长期主义' },
+      { name: '高敏感', type: 'HSP', traits: '对环境细节有极高的感知力，能够捕捉到他人忽略的微妙变化。情感体验深刻而复杂，共情能力极强，但也容易受到外部情绪的干扰。\n\n在安静的环境中创造力最强，嘈杂会使其迅速耗能。习惯深度独处，从内省中获取能量。', tools: '情绪记录法\n场景切换\n边界建立' },
+      { name: '理性派', type: 'ESTP', traits: '务实主义者，擅长在复杂局面中找到最直接的解决路径。行动力强，偏好即兴发挥而非过度规划。对风险有敏锐嗅觉。\n\n不惧怕冲突，甚至在冲突中能保持异常清醒。社交能力强，能够快速与陌生人建立联系。', tools: '成本收益分析\n压力测试\n快速迭代' }
+    ];
+    function showDetail(idx) {
+      const d = data[idx];
+      document.getElementById('detailContent').innerHTML = '<div class="detail-name">'+d.name+'</div><div class="detail-type">'+d.type+'</div><div class="detail-section"><div class="detail-label">特质</div><div class="detail-text">'+d.traits.replace(/\n/g, '\n')+'</div></div><div class="detail-section"><div class="detail-label">工具</div><div class="detail-text">'+d.tools.replace(/\n/g, '\n')+'</div></div>';
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('detailView').classList.add('active');
+      window.scrollTo(0,0);
+    }
+    function showList() {
+      document.getElementById('listView').classList.remove('hidden');
+      document.getElementById('detailView').classList.remove('active');
+    }
+  </script>
+</body>
+</html>
