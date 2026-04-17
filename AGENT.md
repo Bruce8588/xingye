@@ -190,6 +190,9 @@ Apache（httpd）可能仍在运行并抢掉 Nginx 的端口。发现异常响�
 systemctl stop httpd && systemctl disable httpd
 ```
 
+### Nginx /xingye/ 的 root 配置
+`/xingye/` 和 `/xingye` location 的 root 必须指向 `/opt/xingye/html`，不要指向 `/var/www`。文件在 `/opt/xingye/html/xingye/`。
+
 ---
 
 ## 🛠️ 关键文件路径
