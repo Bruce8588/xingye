@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日行动 - Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root {
+  --bg:#F5F3EF; --card:#FFF9F4; --accent:#C8742A; --accent-light:#E8A065;
+  --text:#3D2517; --text-muted:#7A5030; --border:rgba(180,120,80,0.2);
+  --sidebar-w:280px;
+}
+body{font-family:'Noto Sans SC','Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+
+/* ── 顶部导航 ── */
+.topbar{display:flex;align-items:center;padding:0 20px;height:56px;background:var(--card);border-bottom:1px solid var(--border);gap:12px;position:sticky;top:0;z-index:100}
+.topbar-title{flex:1;font-weight:700;font-size:1.1rem;color:var(--text)}
+.topbar-date{font-size:0.8rem;color:var(--text-muted);margin-left:auto;margin-right:16px}
+.topbar-btn{padding:6px 14px;border-radius:20px;font-size:0.8rem;font-weight:500;transition:all 0.2s;display:flex;align-items:center;gap:5px}
+.topbar-btn.accent{background:var(--accent);color:#fff}
+.topbar-btn.accent:hover{background:var(--accent-light)}
+.topbar-btn.outline{border:1px solid var(--border);color:var(--text)}
+.topbar-btn.outline:hover{background:rgba(200,116,42,0.06)}
+
+/* ── 主布局 ── */
+.main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 340px;gap:20px}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+
+/* ── 卡片通用 ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:0.95rem}
+.card-title .icon{font-size:1rem}
+
+/* ── 每日规划 ── */
+.plan-textarea{width:100%;min-height:120px;background:transparent;border:none;resize:none;font-family:inherit;font-size:0.875rem;line-height:1.7;color:var(--text);outline:none}
+.plan-textarea::placeholder{color:var(--text-muted);opacity:0.6}
+.save-plan-btn{padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:500;background:rgba(200,116,42,0.12);color:var(--accent);transition:all 0.2s}
+.save-plan-btn:hover{background:rgba(200,116,42,0.22)}
+
+/* ── 今日待办 ── */
+.todo-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.todo-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#FFFBF5;border:1px solid var(--border);transition:all 0.2s;cursor:pointer}
+.todo-item:hover{background:#FFF5EA}
+.todo-item.done{opacity:0.55}
+.todo-item.done .todo-text{text-decoration:line-through}
+.check-btn{width:18px;height:18px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s}
+.check-btn.checked{background:var(--accent)}
+.check-btn.checked svg{color:#fff}
+.todo-text{flex:1;font-size:0.875rem}
+.priority-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.priority-high{background:#E53E3E}
+.priority-medium{background:var(--accent)}
+.priority-low{background:#38A169}
+.delete-btn{opacity:0;padding:4px 8px;border-radius:6px;font-size:0.75rem;color:#E53E3E;transition:all 0.2s}
+.todo-item:hover .delete-btn{opacity:1}
+.delete-btn:hover{background:rgba(229,62,62,0.1)}
+.add-todo-row{display:flex;gap:8px;margin-top:12px}
+.add-todo-input{flex:1;padding:10px 14px;border-radius:12px;border:1.5px solid var(--border);background:#FFF9F4;font-size:0.875rem;font-family:inherit;outline:none;transition:border-color 0.2s}
+.add-todo-input:focus{border-color:var(--accent)}
+.add-todo-btn{padding:10px 18px;border-radius:12px;background:var(--accent);color:#fff;font-size:0.875rem;font-weight:500}
+
+/* ── 工作流卡片 ── */
+.workflow-item{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:10px;background:#FFFBF5;border:1px solid var(--border);margin-bottom:8px}
+.workflow-item:last-child{margin-bottom:0}
+.workflow-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:0.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.workflow-text{flex:1;font-size:0.875rem;line-height:1.6;word-break:break-word}
+.workflow-empty{text-align:center;padding:16px 0;color:var(--text-muted);font-size:0.875rem}
+.wf-edit-hint{font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;opacity:0.7}
+.wf-input-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.wf-input-num{font-size:0.75rem;color:var(--accent);min-width:20px;text-align:right;padding-top:10px;flex-shrink:0}
+.wf-textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:#FFFBF5;font-size:0.8125rem;font-family:inherit;resize:none;outline:none;min-height:38px;line-height:1.5;transition:border-color 0.2s}
+.wf-textarea:focus{border-color:var(--accent)}
+
+/* ── 收集箱侧边栏 ── */
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;transition:opacity 0.3s}
+.sidebar{position:fixed;top:0;right:0;width:var(--sidebar-w);height:100%;background:#FFF9F4;border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease}
+.sidebar.open{transform:translateX(0)}
+.sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.sidebar-title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:0.95rem}
+.badge{padding:1px 7px;border-radius:20px;font-size:0.7rem;font-weight:600;background:var(--accent);color:#fff}
+.close-btn{padding:6px;border-radius:8px;color:var(--text-muted);transition:all 0.2s}
+.close-btn:hover{background:rgba(200,116,42,0.1);color:var(--text)}
+.sidebar-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:3px}
+.inbox-input-wrap{display:flex;flex-direction:column;gap:8px;padding:14px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.inbox-textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#FFF9F4;font-size:0.8125rem;font-family:inherit;resize:none;outline:none;min-height:60px;transition:border-color 0.2s;line-height:1.5}
+.inbox-textarea:focus{border-color:var(--accent)}
+.inbox-textarea::placeholder{color:var(--text-muted);opacity:0.6}
+.tag-hint{font-size:0.7rem;color:var(--text-muted);padding:0 2px}
+.inbox-add-row{display:flex;gap:6px;align-items:center}
+.inbox-date-input{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:#FFF9F4;font-size:0.75rem;font-family:inherit;outline:none;color:var(--text);flex:1}
+.priority-select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:#FFF9F4;font-size:0.75rem;font-family:inherit;outline:none;color:var(--text)}
+.inbox-submit{padding:7px 14px;border-radius:8px;background:var(--accent);color:#fff;font-size:0.8rem;font-weight:500;white-space:nowrap}
+.inbox-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid transparent;transition:all 0.2s;cursor:pointer;position:relative}
+.inbox-item:hover{background:#FFF5EA;border-color:var(--border)}
+.inbox-item.done{opacity:0.5}
+.inbox-item.overdue{background:#FFF5F5;border-color:rgba(229,62,62,0.2)}
+.inbox-check{width:18px;height:18px;border-radius:50%;border:2px solid #C0C0C0;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.inbox-check.checked{border-color:var(--accent);background:var(--accent)}
+.inbox-check.checked svg{color:#fff}
+.inbox-content{flex:1;min-width:0}
+.inbox-text{font-size:0.8125rem;line-height:1.5;word-break:break-word}
+.inbox-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.tag-chip{padding:1px 8px;border-radius:20px;font-size:0.7rem;font-weight:500}
+.tag-deadline{background:rgba(200,116,42,0.15);color:#C8742A}
+.tag-overdue{background:rgba(229,62,62,0.15);color:#E53E3E}
+.tag-done{background:rgba(56,161,105,0.15);color:#38A169}
+.inbox-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:4px;opacity:0;transition:opacity 0.2s}
+.inbox-item:hover .inbox-actions{opacity:1}
+.action-btn{padding:3px 8px;border-radius:6px;font-size:0.7rem;transition:all 0.15s}
+.action-move{background:rgba(200,116,42,0.1);color:var(--accent)}
+.action-move:hover{background:rgba(200,116,42,0.2)}
+.action-del{background:rgba(229,62,62,0.1);color:#E53E3E}
+.action-del:hover{background:rgba(229,62,62,0.2)}
+.empty-inbox{text-align:center;padding:40px 0;color:var(--text-muted);font-size:0.875rem}
+.empty-inbox svg{opacity:0.3;margin-bottom:8px}
+
+/* ── 快捷捕获浮窗 ── */
+.quick-capture{position:fixed;top:20%;left:50%;transform:translateX(-50%);width:min(560px,94vw);background:#FFF9F4;border:1px solid var(--border);border-radius:20px;z-index:300;box-shadow:0 20px 60px rgba(0,0,0,0.25);display:none;flex-direction:column;overflow:hidden}
+.quick-capture.active{display:flex}
+.qc-header{padding:14px 20px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.qc-icon{font-size:1.1rem}
+.qc-title{font-size:0.875rem;font-weight:600;color:var(--text)}
+.qc-hint{font-size:0.7rem;color:var(--text-muted);margin-left:auto;background:#F1F1F1;padding:2px 8px;border-radius:6px;font-family:monospace}
+.qc-body{padding:16px 20px}
+.qc-textarea{width:100%;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:0.9rem;font-family:inherit;resize:none;min-height:80px;outline:none;background:#FFF9F4;line-height:1.6;transition:border-color 0.2s}
+.qc-textarea:focus{border-color:var(--accent)}
+.qc-textarea::placeholder{color:var(--text-muted);opacity:0.6}
+.qc-preview{padding:8px 14px;background:#FFF5EA;border-radius:8px;font-size:0.75rem;color:var(--text-muted);margin-top:8px;min-height:28px}
+.qc-footer{padding:10px 20px 14px;display:flex;align-items:center;justify-content:space-between}
+.qc-tags{display:flex;gap:6px;align-items:center}
+.qc-date-input{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:#FFF9F4;font-size:0.75rem;font-family:inherit;outline:none;color:var(--text)}
+.qc-priority{font-size:0.75rem;color:var(--text-muted);margin-left:6px}
+.qc-submit{padding:8px 20px;border-radius:10px;background:var(--accent);color:#fff;font-size:0.875rem;font-weight:500}
+
+/* ── Toast ── */
+.toast{position:fixed;top:72px;left:50%;transform:translateX(-50%) translateY(-10px);padding:10px 22px;background:rgba(30,30,30,0.88);color:#fff;border-radius:24px;font-size:0.8rem;opacity:0;transition:all 0.3s;z-index:500;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{background:rgba(56,161,105,0.92)}
+.toast.error{background:rgba(229,62,62,0.92)}
+
+/* ── 复盘侧边栏 ── */
+.review-sidebar{position:fixed;top:0;right:0;width:420px;height:100%;background:#FFF9F4;border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;overflow:hidden}
+.review-sidebar.open{transform:translateX(0)}
+.review-header{display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);gap:8px;flex-shrink:0}
+.review-nav-btn{padding:5px 10px;border-radius:8px;font-size:0.7rem;border:1px solid var(--border);color:var(--text-muted);transition:all 0.2s;white-space:nowrap}
+.review-nav-btn:hover{background:rgba(200,116,42,0.08);color:var(--text)}
+.review-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.date-label{font-size:0.8rem;color:var(--text-muted);font-weight:500;text-align:center}
+.section-label{font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.review-textarea{width:100%;min-height:90px;padding:12px;border-radius:12px;border:1px solid var(--border);background:#FFFBF5;font-size:0.875rem;font-family:inherit;resize:none;outline:none;line-height:1.6;transition:border-color 0.2s}
+.review-textarea:focus{border-color:var(--accent)}
+.review-textarea::placeholder{color:var(--text-muted);opacity:0.7}
+
+/* ── 1-10 分制 ── */
+.score-section{margin-bottom:4px}
+.score-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.score-label-text{font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px}
+.score-value{font-size:0.875rem;font-weight:700;color:var(--accent)}
+.score-track{display:flex;gap:4px;align-items:center}
+.score-btn{width:100%;aspect-ratio:1;border-radius:8px;border:1.5px solid var(--border);font-size:0.75rem;transition:all 0.15s;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#FFFBF5;color:var(--text-muted)}
+.score-btn:hover{border-color:var(--accent);color:var(--accent)}
+.score-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.score-hint{font-size:0.65rem;color:var(--text-muted);margin-top:4px}
+
+/* ── 标签自由添加 ── */
+.tags-input-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:10px;border-radius:12px;border:1px solid var(--border);background:#FFFBF5;min-height:44px;align-items:center;cursor:text;transition:border-color 0.2s}
+.tags-input-wrap:focus-within{border-color:var(--accent)}
+.tag-badge{display:flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:0.75rem;background:rgba(200,116,42,0.15);color:var(--accent);font-weight:500}
+.tag-badge-remove{font-size:0.9rem;cursor:pointer;opacity:0.6;line-height:1}
+.tag-badge-remove:hover{opacity:1}
+.tag-input{flex:1;min-width:80px;border:none;background:transparent;outline:none;font-size:0.8125rem;font-family:inherit;color:var(--text);padding:2px 4px}
+.tag-suggest{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.tag-suggest-btn{padding:3px 10px;border-radius:20px;font-size:0.7rem;border:1px solid var(--border);color:var(--text-muted);transition:all 0.15s}
+.tag-suggest-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── 历史日历 ── */
+.history-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
+.cal-header{font-size:0.65rem;font-weight:600;color:var(--text-muted);text-align:center;padding:4px 0}
+.cal-day{aspect-ratio:1;border-radius:8px;font-size:0.75rem;text-align:center;line-height:28px;cursor:pointer;transition:all 0.15s}
+.cal-day:hover{background:#FFF5EA}
+.cal-day.has-record{background:rgba(200,116,42,0.15);color:var(--accent);font-weight:600}
+.cal-day.today{background:var(--accent);color:#fff}
+.cal-day.current{background:#FFF5EA;border:1px solid var(--accent)}
+.cal-day.future{opacity:0.35;cursor:default}
+.cal-day.empty{}
+
+/* ── 分析卡片 ── */
+.review-analysis-card{background:#FFFBF5;border:1px solid var(--border);border-radius:14px;padding:14px}
+.analysis-title{font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.analysis-stat{padding:10px;border-radius:10px;background:#FFF9F4;text-align:center}
+.analysis-stat-num{font-size:1.4rem;font-weight:700;color:var(--accent)}
+.analysis-stat-label{font-size:0.7rem;color:var(--text-muted);margin-top:2px}
+.analysis-message{font-size:0.8rem;color:var(--text-muted);padding:8px 12px;background:#FFF5EA;border-radius:8px;text-align:center}
+
+.save-review-btn{width:100%;padding:12px;border-radius:12px;background:var(--accent);color:#fff;font-size:0.875rem;font-weight:600;transition:all 0.2s}
+.save-review-btn:hover{background:var(--accent-light)}
+
+/* ── 右下角固定按钮 ── */
+.fab{position:fixed;bottom:24px;right:24px;z-index:100;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.fab-main{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 4px 20px rgba(200,116,42,0.4);transition:all 0.2s}
+.fab-main:hover{transform:scale(1.08);background:var(--accent-light)}
+.fab-hint{font-size:0.65rem;color:var(--text-muted);text-align:right;background:rgba(255,255,255,0.9);padding:3px 8px;border-radius:6px}
+
+.placeholder{color:var(--text-muted);font-size:0.875rem;opacity:0.7}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Toast -->
+  <div class="toast" :class="[toast.type, {show: toast.visible}]">{{ toast.message }}</div>
+
+  <!-- 快捷捕获浮窗 -->
+  <div class="quick-capture" :class="{active: qcOpen}">
+    <div class="qc-header">
+      <span class="qc-icon">📝</span>
+      <span class="qc-title">快速添加</span>
+      <span class="qc-hint">Ctrl+K · Esc 关闭</span>
+    </div>
+    <div class="qc-body">
+      <textarea class="qc-textarea" v-model="qcText" ref="qcTextarea"
+        @keydown.enter.ctrl="submitQC"
+        @keydown.esc="qcOpen=false"
+        placeholder="写点什么... 支持 #明天 #后天 #周五 等日期快捷词"
+        rows="3"></textarea>
+      <div class="qc-preview" v-if="qcParsedDeadline">
+        <span>📅 自动识别：</span><strong>{{ qcParsedDeadline }}</strong>
+      </div>
+    </div>
+    <div class="qc-footer">
+      <div class="qc-tags">
+        <input class="qc-date-input" type="date" v-model="qcDeadline" />
+        <select class="priority-select" v-model="qcPriority">
+          <option value="high">🔴 高</option>
+          <option value="medium">🟡 中</option>
+          <option value="low">🟢 低</option>
+        </select>
+      </div>
+      <button class="qc-submit" @click="submitQC">添加</button>
+    </div>
+  </div>
+
+  <!-- 顶部导航 -->
+  <div class="topbar">
+    <div class="topbar-title">✨ 每日行动</div>
+    <div class="topbar-date">{{ todayDateStr }}</div>
+    <button class="topbar-btn outline" @click="reviewOpen=true">📓 今日复盘</button>
+    <button class="topbar-btn accent" @click="inboxOpen=true">
+      📥 收集箱 <span class="badge" v-if="inboxCount>0">{{ inboxCount }}</span>
+    </button>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main">
+
+    <!-- 左侧：规划 -->
+    <div class="left" style="display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🎯</span> 每日规划</div>
+          <button class="save-plan-btn" @click="savePlan" :disabled="savingPlan">
+            {{ savingPlan ? '保存中...' : '保存规划' }}
+          </button>
+        </div>
+        <textarea class="plan-textarea" v-model="dailyPlan"
+          placeholder="今天最重要的事是什么？写下你的规划..."></textarea>
+      </div>
+
+      <!-- 项目进度 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">📁</span> 项目进度</div>
+          <button class="save-plan-btn" @click="showAddProject=!showAddProject" style="font-size:0.75rem">+ 添加</button>
+        </div>
+
+        <!-- 添加项目表单 -->
+        <div v-if="showAddProject" style="margin-bottom:14px;padding:12px;border-radius:12px;background:#FFFBF5;border:1px solid var(--border)">
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input v-model="newProject.emoji" placeholder="😀" class="w-12 text-center px-2 py-2 rounded-lg text-sm" style="background:#FFFBF5;border:1px solid var(--border);outline:none" />
+            <input v-model="newProject.name" @keydown.enter="addProject" placeholder="项目名称" class="flex-1 px-3 py-2 rounded-lg text-sm" style="background:#FFFBF5;border:1px solid var(--border);outline:none;color:var(--text)" />
+          </div>
+          <div style="display:flex;gap:6px">
+            <button @click="addProject" style="flex:1;padding:7px;border-radius:8px;background:var(--accent);color:#fff;font-size:0.8rem;font-weight:500">添加</button>
+            <button @click="showAddProject=false; newProject={emoji:'📁',name:''}" style="padding:7px 14px;border-radius:8px;background:rgba(200,116,42,0.1);color:var(--accent);font-size:0.8rem">取消</button>
+          </div>
+        </div>
+
+        <!-- 项目列表 -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div v-for="p in projects" :key="p.id"
+            style="padding:12px 14px;border-radius:12px;background:#FFFBF5;border:1px solid var(--border);cursor:pointer;transition:all 0.2s"
+            @mouseenter="$event.currentTarget.style.backgroundColor='#FFF5EA'"
+            @mouseleave="$event.currentTarget.style.backgroundColor='#FFFBF5'">
+
+            <!-- 项目头部 -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.1rem">{{ p.emoji }}</span>
+                <span style="font-weight:600;font-size:0.875rem">{{ p.name }}</span>
+              </div>
+              <div style="display:flex;gap:4px;opacity:0;transition:opacity 0.2s"
+                   @mouseenter="$event.currentTarget.style.opacity=1"
+                   @mouseleave="$event.currentTarget.style.opacity=0">
+                <button @click.stop="startEditProject(p)" style="padding:3px 8px;border-radius:6px;font-size:0.7rem;background:rgba(200,116,42,0.1);color:var(--accent)">编辑</button>
+                <button @click.stop="deleteProject(p.id)" style="padding:3px 8px;border-radius:6px;font-size:0.7rem;background:rgba(229,62,62,0.1);color:#E53E3E">删除</button>
+              </div>
+            </div>
+
+            <!-- 编辑模式 -->
+            <div v-if="editingProjectId===p.id" @click.stop style="margin-top:8px">
+              <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+                <div v-for="(field, fkey) in {problem:{label:'核心问题',placeholder:'当前最核心的问题？'},plan:{label:'行动计划',placeholder:'具体要做什么？'},target:{label:'目标',placeholder:'想要达成的结果？'}}" :key="fkey">
+                  <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">{{ field.label }}</div>
+                  <input v-model="editProject[fkey]" :placeholder="field.placeholder"
+                    style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:#FFF9F4;font-size:0.8rem;outline:none;color:var(--text)" />
+                </div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button @click="saveEditProject(p.id)" style="flex:1;padding:7px;border-radius:8px;background:var(--accent);color:#fff;font-size:0.8rem;font-weight:500">保存</button>
+                <button @click.stop="editingProjectId=null" style="padding:7px 12px;border-radius:8px;background:rgba(200,116,42,0.1);color:var(--accent);font-size:0.8rem">取消</button>
+              </div>
+            </div>
+
+            <!-- 展示模式 -->
+            <div v-else>
+              <div v-for="(val, key) in {problem:'问题',plan:'计划',target:'目标'}" :key="key"
+                   v-if="p[key]"
+                   style="display:flex;gap:6px;margin-bottom:4px;font-size:0.8rem">
+                <span style="color:var(--text-muted);flex-shrink:0;text-transform:uppercase;font-size:0.65rem;padding-top:2px">{{ val }}</span>
+                <span style="color:var(--text)">{{ p[key] }}</span>
+              </div>
+              <div v-if="!p.problem && !p.plan && !p.target" style="font-size:0.8rem;color:var(--text-muted);font-style:italic">点击编辑填写计划</div>
+            </div>
+          </div>
+          <div v-if="projects.length===0" style="text-align:center;padding:20px 0;color:var(--text-muted);font-size:0.875rem">
+            还没有项目，点击右上角添加
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧：今日待办 + 工作流 -->
+    <div class="right" style="display:flex;flex-direction:column;gap:20px">
+
+      <!-- 今日待办 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">✅</span> 今日待办</div>
+          <span class="badge" v-if="todayDoneCount>0" style="background:#38A169">{{ todayDoneCount }}/{{ todayItems.length }}</span>
+          <span class="badge" v-else-if="todayItems.length>0">{{ todayItems.length }}</span>
+        </div>
+        <ul class="todo-list">
+          <li class="todo-item" :class="{done: item.done}"
+              v-for="item in todayItems" :key="item.id"
+              @click="toggleToday(item)">
+            <div class="check-btn" :class="{checked:item.done}">
+              <svg v-if="item.done" width="10" height="10" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="white" stroke-width="1.5" fill="none"/></svg>
+            </div>
+            <span class="todo-text">{{ item.text }}</span>
+            <div class="priority-dot" :class="'priority-'+item.priority"></div>
+            <button class="delete-btn" @click.stop="deleteToday(item.id)">删除</button>
+          </li>
+          <li v-if="todayItems.length===0" style="padding:12px 0;color:var(--text-muted);font-size:0.875rem;text-align:center">
+            还没有待办，添加一个吧
+          </li>
+        </ul>
+        <div class="add-todo-row">
+          <input class="add-todo-input" v-model="newTodoText" @keydown.enter="addTodo"
+            placeholder="添加待办，回车确认..." />
+          <button class="add-todo-btn" @click="addTodo">添加</button>
+        </div>
+      </div>
+
+      <!-- 工作流 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🔄</span> 工作流</div>
+          <button
+            @click="wfEditing ? saveWorkflow() : (wfLines.length===0&&wfLines.push(''), wfEditing=true)"
+            class="save-plan-btn"
+            style="font-size:0.75rem"
+          >
+            {{ wfEditing ? '保存' : '编辑' }}
+          </button>
+        </div>
+
+        <!-- 编辑模式 -->
+        <div v-if="wfEditing">
+          <div class="wf-edit-hint">Enter 新增行，Backspace 删除空行</div>
+          <div v-for="(line, idx) in wfLines" :key="idx" class="wf-input-row">
+            <span class="wf-input-num">{{ idx+1 }}.</span>
+            <textarea class="wf-textarea"
+              v-model="wfLines[idx]"
+              @keydown="wfKeyDown($event, idx)"
+              rows="1"
+              :ref="el => { if(el) { el.style.height='auto'; el.style.height=el.scrollHeight+'px'; wfRefs[idx]=el } }"
+              :placeholder="'步骤 '+(idx+1)"></textarea>
+          </div>
+        </div>
+
+        <!-- 展示模式 -->
+        <div v-else>
+          <div v-if="wfSteps.length===0" class="workflow-empty">点击「编辑」记录工作流程</div>
+          <div v-for="(step, idx) in wfSteps" :key="idx" class="workflow-item">
+            <div class="workflow-num">{{ idx+1 }}</div>
+            <div class="workflow-text">{{ step }}</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <div class="fab">
+    <span class="fab-hint">Ctrl+K 快速添加</span>
+    <button class="fab-main" @click="qcOpen=true" title="快速添加">+</button>
+  </div>
+
+  <!-- 收集箱侧边栏 -->
+  <div class="sidebar-overlay" v-if="inboxOpen" @click="inboxOpen=false"></div>
+  <div class="sidebar" :class="{open: inboxOpen}">
+    <div class="sidebar-header">
+      <div class="sidebar-title">
+        <span>📥</span> 收集箱
+        <span class="badge">{{ inboxCount }}</span>
+      </div>
+      <button class="close-btn" @click="inboxOpen=false">✕</button>
+    </div>
+    <div class="sidebar-body">
+      <div class="inbox-input-wrap">
+        <textarea class="inbox-textarea" v-model="inboxNewText"
+          @keydown.enter.ctrl="addInboxItem"
+          placeholder="记录想法... (Ctrl+Enter 添加)"
+          rows="2"></textarea>
+        <div class="tag-hint">💡 支持 #明天 #后天 #周五 或具体日期</div>
+        <div class="inbox-add-row">
+          <input class="inbox-date-input" type="date" v-model="inboxNewDeadline" />
+          <select class="priority-select" v-model="inboxNewPriority">
+            <option value="high">高</option>
+            <option value="medium" selected>中</option>
+            <option value="low">低</option>
+          </select>
+          <button class="inbox-submit" @click="addInboxItem">添加</button>
+        </div>
+      </div>
+
+      <div v-if="inboxItems.length===0" class="empty-inbox">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 8v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 3v4M16 3v4M12 3v4"/></svg>
+        <div>收集箱是空的</div>
+      </div>
+
+      <div v-for="item in inboxItems" :key="item.id"
+           class="inbox-item"
+           :class="{done: item.done, overdue: isOverdue(item)}"
+           @click="toggleInbox(item)">
+        <div class="inbox-check" :class="{checked:item.done}">
+          <svg v-if="item.done" width="10" height="10" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="white" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="inbox-content">
+          <div class="inbox-text">{{ item.text }}</div>
+          <div class="inbox-tags">
+            <span v-if="item.deadline !== 'inbox'" class="tag-chip tag-deadline">📅 {{ formatDeadline(item.deadline) }}</span>
+            <span v-if="isOverdue(item)" class="tag-chip tag-overdue">⚠️ 逾期</span>
+          </div>
+        </div>
+        <div class="inbox-actions">
+          <button class="action-btn action-move" @click.stop="moveToToday(item)">→ 今日</button>
+          <button class="action-btn action-del" @click.stop="deleteInbox(item.id)">删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 复盘侧边栏 -->
+  <div class="sidebar-overlay" v-if="reviewOpen" @click="reviewOpen=false"></div>
+  <div class="review-sidebar" :class="{open: reviewOpen}">
+    <div class="review-header">
+      <button class="close-btn" @click="reviewOpen=false">✕</button>
+      <div class="sidebar-title" style="flex:1"><span>📓</span> 每日复盘</div>
+      <button class="review-nav-btn" @click="reviewDate=shiftDate(reviewDate,-1)">◀</button>
+      <button class="review-nav-btn" @click="reviewDate=todayStr">今天</button>
+      <button class="review-nav-btn" @click="reviewDate=shiftDate(reviewDate,1)">▶</button>
+    </div>
+    <div class="review-body">
+
+      <div class="date-label">{{ reviewDateStr }}</div>
+
+      <!-- 快速日历 -->
+      <div>
+        <div class="section-label" style="margin-bottom:6px">📅 {{ reviewMonthLabel }}</div>
+        <div class="history-calendar">
+          <div class="cal-header" v-for="d in ['一','二','三','四','五','六','日']" :key="d">{{ d }}</div>
+          <div v-for="(day, idx) in calendarDays" :key="idx"
+               class="cal-day"
+               :class="{
+                 'has-record': hasRecord(day.date),
+                 'today': day.date === todayStr,
+                 'current': day.date === reviewDate,
+                 'future': day.isFuture,
+                 'empty': !day.day
+               }"
+               @click="!day.isFuture && day.day && (reviewDate = day.date)"
+               :style="day.day ? {} : {cursor:'default'}">
+            {{ day.day || '' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日完成情况 -->
+      <div>
+        <div class="section-label">✅ 今日完成 ({{ reviewTodayDoneCount }} 项)</div>
+        <div v-if="reviewTodayItems.length > 0" style="display:flex;flex-direction:column;gap:5px">
+          <div v-for="item in reviewTodayItems" :key="item.id"
+               style="padding:7px 10px;background:#FFFBF5;border-radius:8px;font-size:0.8rem;display:flex;align-items:center;gap:8px;color:#38A169">
+            ✓ {{ item.text }}
+          </div>
+        </div>
+        <div v-else style="font-size:0.8rem;color:var(--text-muted)">暂无完成项</div>
+      </div>
+
+      <!-- 复盘内容 -->
+      <div>
+        <div class="section-label">📝 今日总结</div>
+        <textarea class="review-textarea" v-model="reviewContent"
+          placeholder="今天做了什么？有哪些收获？"></textarea>
+      </div>
+
+      <!-- 明日计划 -->
+      <div>
+        <div class="section-label">🚀 明日计划</div>
+        <textarea class="review-textarea" v-model="reviewTomorrowPlan"
+          placeholder="明天要做什么？" style="min-height:70px"></textarea>
+      </div>
+
+      <!-- 心情评分 -->
+      <div class="score-section">
+        <div class="score-label-row">
+          <span class="score-label-text">😊 心情指数</span>
+          <span class="score-value">{{ reviewMood }}/10</span>
+        </div>
+        <div class="score-track">
+          <button v-for="n in 10" :key="n"
+            class="score-btn"
+            :class="{active: reviewMood >= n}"
+            @click="reviewMood = n"
+            :style="reviewMood >= n ? {background: moodColor(reviewMood), borderColor: moodColor(reviewMood)} : {}"
+          >{{ n }}</button>
+        </div>
+        <div class="score-hint">{{ moodLabel(reviewMood) }}</div>
+      </div>
+
+      <!-- 精力评分 -->
+      <div class="score-section">
+        <div class="score-label-row">
+          <span class="score-label-text">⚡ 精力状态</span>
+          <span class="score-value">{{ reviewEnergy }}/10</span>
+        </div>
+        <div class="score-track">
+          <button v-for="n in 10" :key="n"
+            class="score-btn"
+            :class="{active: reviewEnergy >= n}"
+            @click="reviewEnergy = n"
+            :style="reviewEnergy >= n ? {background: energyColor(reviewEnergy), borderColor: energyColor(reviewEnergy)} : {}"
+          >{{ n }}</button>
+        </div>
+        <div class="score-hint">{{ energyLabel(reviewEnergy) }}</div>
+      </div>
+
+      <!-- 标签 -->
+      <div>
+        <div class="section-label">🏷️ 标签（自由添加）</div>
+        <div class="tags-input-wrap" @click="focusTagInput">
+          <span v-for="(tag, idx) in reviewTags" :key="tag" class="tag-badge">
+            {{ tag }}
+            <span class="tag-badge-remove" @click.stop="reviewTags.splice(idx,1)">×</span>
+          </span>
+          <input class="tag-input" v-model="tagInput" ref="tagInputRef"
+            @keydown.enter.prevent="addTag"
+            @keydown.backspace="tagInput==='' && reviewTags.length && reviewTags.pop()"
+            @keydown.comma.prevent="addTag"
+            placeholder="输入标签后回车..." />
+        </div>
+        <div class="tag-suggest">
+          <button v-for="t in suggestTags" :key="t" class="tag-suggest-btn"
+            @click="addTagFromSuggest(t)"
+            :style="reviewTags.includes(t) ? {opacity:0.4, borderColor:'#ccc'} : {}">{{ t }}</button>
+        </div>
+      </div>
+
+      <!-- 保存 -->
+      <button class="save-review-btn" @click="saveReview">💾 保存复盘</button>
+
+      <!-- 进度分析 -->
+      <div class="review-analysis-card" v-if="recentAnalysis">
+        <div class="analysis-title">📊 {{ recentAnalysis.period }} 进展</div>
+        <div class="analysis-grid">
+          <div class="analysis-stat">
+            <div class="analysis-stat-num">{{ recentAnalysis.total_completed }}</div>
+            <div class="analysis-stat-label">完成任务</div>
+          </div>
+          <div class="analysis-stat">
+            <div class="analysis-stat-num">{{ recentAnalysis.total_reviews }}</div>
+            <div class="analysis-stat-label">复盘次数</div>
+          </div>
+        </div>
+        <div class="analysis-message">{{ recentAnalysis.message }}</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const { createApp, ref, computed, watch, onMounted, nextTick } = Vue
+
+const API = '/api'
+
+createApp({
+  setup() {
+
+    // ── Toast ──────────────────────────────────────
+    const toast = ref({ visible: false, message: '', type: 'success' })
+    function showToast(msg, type='success') {
+      toast.value = { visible: true, message: msg, type }
+      setTimeout(() => toast.value.visible = false, 2200)
+    }
+
+    // ── 日期工具 ────────────────────────────────────
+    const todayStr = new Date().toISOString().split('T')[0]
+    const todayDateStr = computed(() => {
+      const d = new Date()
+      return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`
+    })
+    function shiftDate(ds, delta) {
+      const d = new Date(ds)
+      d.setDate(d.getDate() + delta)
+      return d.toISOString().split('T')[0]
+    }
+    function formatDeadline(d) {
+      if (d === todayStr) return '今天'
+      if (d === shiftDate(todayStr, 1)) return '明天'
+      if (d === shiftDate(todayStr, 2)) return '后天'
+      return d
+    }
+    function isOverdue(item) {
+      if (!item.deadline || item.deadline === 'inbox' || item.done) return false
+      return item.deadline < todayStr
+    }
+    function parseInlineDate(text) {
+      const m = text.match(/#(明天|后天|周五|周六|周日|下周一|下周二|下周三|下周四|下周五|下周六|下周日)/)
+      if (!m) return null
+      const map = { '明天':1,'后天':2,'周五':5,'周六':6,'周日':0,'下周一':8,'下周二':9,'下周三':10,'下周四':11,'下周五':12,'下周六':13,'下周日':14 }
+      const d = new Date()
+      d.setDate(d.getDate() + (map[m[1]] || 0))
+      return d.toISOString().split('T')[0]
+    }
+
+    // ── 全局快捷键 ──────────────────────────────────
+    const qcOpen = ref(false)
+    const qcText = ref('')
+    const qcDeadline = ref('')
+    const qcPriority = ref('medium')
+    const qcParsedDeadline = computed(() => {
+      const inline = parseInlineDate(qcText.value)
+      if (inline) return formatDeadline(inline)
+      if (qcDeadline.value) return formatDeadline(qcDeadline.value)
+      return null
+    })
+    function submitQC() {
+      if (!qcText.value.trim()) return
+      const deadline = parseInlineDate(qcText.value) || qcDeadline.value || 'inbox'
+      const text = qcText.value.replace(/#(明天|后天|周五|周六|周日|下周一|下周二|下周三|下周四|下周五|下周六|下周日)/g, '').trim()
+      addInboxItemAPI(text, deadline, qcPriority.value)
+      qcText.value = ''; qcDeadline.value = ''; qcPriority.value = 'medium'
+      qcOpen.value = false
+      showToast('已添加到收集箱 ✓')
+    }
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        qcOpen.value = !qcOpen.value
+        if (qcOpen.value) nextTick(() => document.querySelector('.qc-textarea')?.focus())
+      }
+      if (e.key === 'Escape') qcOpen.value = false
+    })
+
+    // ── 收集箱 ───────────────────────────────────────
+    const inboxOpen = ref(false)
+    const inboxItems = ref([])
+    const inboxNewText = ref('')
+    const inboxNewDeadline = ref('')
+    const inboxNewPriority = ref('medium')
+
+    async function loadInbox() {
+      const r = await fetch(`${API}/inbox`)
+      inboxItems.value = await r.json()
+    }
+    async function addInboxItemAPI(text, deadline, priority) {
+      const r = await fetch(`${API}/inbox`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ text, deadline: deadline || 'inbox', priority })
+      })
+      const d = await r.json()
+      if (d.success) inboxItems.value.unshift(d.item)
+    }
+    async function addInboxItem() {
+      if (!inboxNewText.value.trim()) return
+      const text = inboxNewText.value.replace(/#(明天|后天|周五|周六|周日|下周一|下周二|下周三|下周四|下周五|下周六|下周日)/g, '').trim()
+      const deadline = parseInlineDate(inboxNewText.value) || inboxNewDeadline.value || 'inbox'
+      await addInboxItemAPI(text, deadline, inboxNewPriority.value)
+      inboxNewText.value = ''; inboxNewDeadline.value = ''
+      showToast('已添加到收集箱 ✓')
+    }
+    async function toggleInbox(item) {
+      item.done = !item.done
+      await fetch(`${API}/inbox/${item.id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ done: item.done ? 1 : 0 })
+      })
+    }
+    async function moveToToday(item) {
+      await fetch(`${API}/inbox/${item.id}/move-today`, { method: 'POST' })
+      inboxItems.value = inboxItems.value.filter(i => i.id !== item.id)
+      await loadToday()
+      showToast('已移到今日待办 ✓')
+    }
+    async function deleteInbox(id) {
+      await fetch(`${API}/inbox/${id}`, { method: 'DELETE' })
+      inboxItems.value = inboxItems.value.filter(i => i.id !== id)
+    }
+
+    // ── 今日待办 ─────────────────────────────────────
+    const todayItems = ref([])
+    const newTodoText = ref('')
+    async function loadToday() {
+      const r = await fetch(`${API}/today`)
+      todayItems.value = await r.json()
+    }
+    async function addTodo() {
+      if (!newTodoText.value.trim()) return
+      const r = await fetch(`${API}/today`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ text: newTodoText.value.trim() })
+      })
+      const d = await r.json()
+      if (d.success) todayItems.value.unshift(d.item)
+      newTodoText.value = ''
+      showToast('已添加 ✓')
+    }
+    async function toggleToday(item) {
+      item.done = !item.done
+      await fetch(`${API}/today/${item.id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ done: item.done })
+      })
+    }
+    async function deleteToday(id) {
+      await fetch(`${API}/today/${id}`, { method: 'DELETE' })
+      todayItems.value = todayItems.value.filter(i => i.id !== id)
+    }
+    const todayDoneCount = computed(() => todayItems.value.filter(i => i.done).length)
+
+    // ── 每日规划 ─────────────────────────────────────
+    const dailyPlan = ref('')
+    const savingPlan = ref(false)
+    async function loadPlan() {
+      const r = await fetch(`${API}/plan`)
+      const d = await r.json()
+      dailyPlan.value = d.plan || ''
+    }
+    async function savePlan() {
+      savingPlan.value = true
+      await fetch(`${API}/plan`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ plan: dailyPlan.value })
+      })
+      savingPlan.value = false
+      showToast('规划已保存 ✓')
+    }
+
+    // ── 工作流 ──────────────────────────────────────
+    const wfSteps = ref([])
+    const wfEditing = ref(false)
+    const wfLines = ref([])
+    const wfRefs = ref([])
+
+    async function loadWorkflow() {
+      const r = await fetch(`${API}/workflow`)
+      const d = await r.json()
+      wfSteps.value = d.steps || []
+    }
+    async function saveWorkflow() {
+      const steps = wfLines.value.filter(l => l.trim())
+      await fetch(`${API}/workflow`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ steps })
+      })
+      wfSteps.value = steps
+      wfEditing.value = false
+      showToast('工作流已保存 ✓')
+    }
+    function wfKeyDown(e, idx) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        wfLines.value.splice(idx + 1, 0, '')
+        nextTick(() => {
+          const el = wfRefs.value[idx + 1]
+          if (el) { el.focus(); el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+        })
+      }
+      if (e.key === 'Backspace' && wfLines.value[idx] === '' && wfLines.value.length > 1) {
+        e.preventDefault()
+        wfLines.value.splice(idx, 1)
+        nextTick(() => {
+          const el = wfRefs.value[Math.max(0, idx - 1)]
+          if (el) { el.focus(); el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+        })
+      }
+    }
+
+    // ── 项目进度 ──────────────────────────────────────
+    const projects = ref([])
+    const showAddProject = ref(false)
+    const newProject = ref({ emoji: '📁', name: '' })
+    const editingProjectId = ref(null)
+    const editProject = ref({ problem: '', plan: '', target: '' })
+
+    async function loadProjects() {
+      const r = await fetch(`${API}/projects`)
+      projects.value = await r.json()
+    }
+    async function addProject() {
+      if (!newProject.value.name.trim()) return
+      const r = await fetch(`${API}/projects`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(newProject.value)
+      })
+      const p = await r.json()
+      projects.value.push(p)
+      newProject.value = { emoji: '📁', name: '' }
+      showAddProject.value = false
+      showToast('项目已添加 ✓')
+    }
+    function startEditProject(p) {
+      editingProjectId.value = p.id
+      editProject.value = { problem: p.problem || '', plan: p.plan || '', target: p.target || '' }
+    }
+    async function saveEditProject(pid) {
+      await fetch(`${API}/projects/${pid}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ...editProject.value, sort_order: 0 })
+      })
+      const p = projects.value.find(x => x.id === pid)
+      if (p) { p.problem = editProject.value.problem; p.plan = editProject.value.plan; p.target = editProject.value.target }
+      editingProjectId.value = null
+      showToast('项目已更新 ✓')
+    }
+    async function deleteProject(pid) {
+      await fetch(`${API}/projects/${pid}`, { method: 'DELETE' })
+      projects.value = projects.value.filter(p => p.id !== pid)
+      showToast('项目已删除')
+    }
+
+    // ── 复盘 ────────────────────────────────────────
+    const reviewOpen = ref(false)
+    const reviewDate = ref(todayStr)
+    const reviewContent = ref('')
+    const reviewTomorrowPlan = ref('')
+    const reviewMood = ref(7)
+    const reviewEnergy = ref(7)
+    const reviewTags = ref([])
+    const reviewTodayItems = ref([])
+    const recordDates = ref([])
+    const recentAnalysis = ref(null)
+    const tagInput = ref('')
+    const tagInputRef = ref(null)
+
+    const suggestTags = ref(['学习','工作','运动','休息','社交','创作','阅读','健康'])
+
+    function focusTagInput() { tagInputRef.value?.focus() }
+    function addTag() {
+      const t = tagInput.value.trim().replace(/,/g, '')
+      if (t && !reviewTags.value.includes(t)) reviewTags.value.push(t)
+      tagInput.value = ''
+    }
+    function addTagFromSuggest(t) {
+      if (!reviewTags.value.includes(t)) reviewTags.value.push(t)
+    }
+
+    // 1-10 分颜色
+    function moodColor(v) {
+      if (v <= 3) return '#E53E3E'
+      if (v <= 6) return '#DD6B20'
+      return '#38A169'
+    }
+    function energyColor(v) {
+      if (v <= 3) return '#E53E3E'
+      if (v <= 6) return '#DD6B20'
+      return '#38A169'
+    }
+    function moodLabel(v) {
+      if (v <= 2) return '😔 很低落'
+      if (v <= 4) return '😕 有些低落'
+      if (v <= 6) return '😐 一般'
+      if (v <= 8) return '🙂 不错'
+      return '😄 很棒！'
+    }
+    function energyLabel(v) {
+      if (v <= 2) return '😴 完全没劲'
+      if (v <= 4) return '🥱 比较疲惫'
+      if (v <= 6) return '💪 正常水平'
+      if (v <= 8) return '⚡ 精力充沛'
+      return '🚀 超级有劲！'
+    }
+
+    const reviewDateStr = computed(() => {
+      if (reviewDate.value === todayStr) return `📅 今天 · ${todayDateStr.value}`
+      const d = new Date(reviewDate.value)
+      return `📅 ${d.getMonth()+1}月${d.getDate()}日`
+    })
+    const reviewMonthLabel = computed(() => {
+      const d = new Date(reviewDate.value)
+      return `${d.getFullYear()}年${d.getMonth()+1}月`
+    })
+    const reviewTodayDoneCount = computed(() => reviewTodayItems.value.length)
+
+    function hasRecord(dateStr) { return recordDates.value.includes(dateStr) }
+
+    async function loadReviewAnalysis() {
+      const r = await fetch(`${API}/review/analysis?days=7`)
+      recentAnalysis.value = await r.json()
+    }
+
+    async function loadReview(date) {
+      const r = await fetch(`${API}/review/${date}`)
+      const d = await r.json()
+      reviewContent.value = d.content || ''
+      reviewTomorrowPlan.value = d.tomorrow_plan || ''
+      reviewMood.value = d.mood * 1 || 7
+      reviewEnergy.value = d.energy * 1 || 7
+      reviewTags.value = JSON.parse(d.tags || '[]')
+      reviewTodayItems.value = (date === todayStr) ? todayItems.value.filter(i => i.done) : []
+    }
+
+    async function saveReview() {
+      await fetch(`${API}/review`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          review_date: reviewDate.value,
+          content: reviewContent.value,
+          tomorrow_plan: reviewTomorrowPlan.value,
+          mood: reviewMood.value,
+          energy: reviewEnergy.value,
+          tags: reviewTags.value
+        })
+      })
+      showToast('复盘已保存 ✓')
+      const r = await fetch(`${API}/reviews`)
+      recordDates.value = await r.json()
+    }
+
+    // 日历
+    const calendarDays = computed(() => {
+      const days = []
+      const d = new Date(reviewDate.value)
+      d.setDate(1)
+      let startDow = (d.getDay() + 6) % 7
+      for (let i = 0; i < startDow; i++) days.push({ day: '', date: '', isFuture: false })
+      const y = d.getFullYear(), m = d.getMonth()
+      const today = new Date()
+      const todayStr2 = today.toISOString().split('T')[0]
+      let cur = new Date(d)
+      while (cur.getMonth() === m) {
+        const ds = cur.toISOString().split('T')[0]
+        days.push({ day: cur.getDate(), date: ds, isFuture: ds > todayStr2 })
+        cur.setDate(cur.getDate() + 1)
+      }
+      return days
+    })
+
+    // ── 统计数据 ─────────────────────────────────────
+    const inboxCount = computed(() => inboxItems.value.length)
+
+    // ── 初始化 ───────────────────────────────────────
+    onMounted(async () => {
+      await Promise.all([loadInbox(), loadToday(), loadPlan(), loadWorkflow(), loadReviewAnalysis(), loadProjects()])
+      const r = await fetch(`${API}/reviews`)
+      recordDates.value = await r.json()
+      await loadReview(todayStr)
+    })
+
+    watch(reviewDate, (d) => loadReview(d))
+    watch(reviewOpen, (open) => {
+      if (open) loadReview(reviewDate.value)
+    })
+
+    return {
+      // Toast
+      toast, showToast,
+      // 日期
+      todayStr, todayDateStr, shiftDate, formatDeadline, isOverdue,
+      // 快捷捕获
+      qcOpen, qcText, qcDeadline, qcPriority, qcParsedDeadline, submitQC,
+      // 收集箱
+      inboxOpen, inboxItems, inboxNewText, inboxNewDeadline, inboxNewPriority,
+      addInboxItem, toggleInbox, moveToToday, deleteInbox, inboxCount,
+      // 今日待办
+      todayItems, newTodoText, addTodo, toggleToday, deleteToday, todayDoneCount,
+      // 规划
+      dailyPlan, savingPlan, savePlan,
+      // 项目
+      projects, showAddProject, newProject, addProject, startEditProject, saveEditProject, deleteProject, editingProjectId, editProject,
+      // 工作流
+      wfSteps, wfEditing, wfLines, wfRefs, saveWorkflow, wfKeyDown,
+      // 复盘
+      reviewOpen, reviewDate, reviewContent, reviewTomorrowPlan,
+      reviewMood, reviewEnergy, reviewTags, tagInput, tagInputRef,
+      suggestTags, focusTagInput, addTag,
+      moodColor, energyColor, moodLabel, energyLabel,
+      reviewDateStr, reviewMonthLabel, hasRecord, saveReview, calendarDays,
+      reviewTodayItems, reviewTodayDoneCount, recentAnalysis,
+      addTagFromSuggest,
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>

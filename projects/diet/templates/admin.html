@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>管理后台 - 饮食记录</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 12px rgba(255, 107, 107, 0.3);
+        }
+        .header-back {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            text-decoration: none;
+        }
+        .header-title {
+            flex: 1;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            padding-right: 44px;
+        }
+        
+        .main {
+            padding: 72px 16px 100px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .stat-num {
+            font-size: 28px;
+            font-weight: 700;
+            color: #FF6B6B;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        /* 操作区 */
+        .action-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .action-btn {
+            flex: 1;
+            height: 44px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+        
+        /* 记录列表 */
+        .record-list {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .record-item {
+            display: flex;
+            gap: 12px;
+            padding: 16px;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        
+        .record-img {
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: #fafafa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .record-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .record-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .record-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .record-user {
+            font-weight: 600;
+            font-size: 15px;
+            color: #FF6B6B;
+        }
+        .record-name {
+            font-size: 15px;
+            font-weight: 500;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .record-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #999;
+        }
+        .record-category {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 11px;
+        }
+        .category-breakfast { background: #FFF3E0; color: #FF9800; }
+        .category-lunch { background: #E8F5E9; color: #4CAF50; }
+        .category-dinner { background: #E3F2FD; color: #2196F3; }
+        .category-snack { background: #FCE4EC; color: #E91E63; }
+        
+        .record-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #fff1f1;
+            color: #FF6B6B;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        /* 日期分组标题 */
+        .date-group-title {
+            padding: 12px 16px;
+            background: #fafafa;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            position: sticky;
+            top: 56px;
+            z-index: 10;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 2000;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        /* 底部导航 */
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+            z-index: 1000;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            text-decoration: none;
+            padding: 8px 20px;
+        }
+        .nav-item.active { color: #FF6B6B; }
+        .nav-item .icon { font-size: 22px; }
+        .nav-item .label { font-size: 11px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="header-back">←</a>
+        <div class="header-title">🔧 管理后台</div>
+    </header>
+    
+    <main class="main">
+        <!-- 统计 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-num" id="totalCount">-</div>
+                <div class="stat-label">总记录</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="todayCount">-</div>
+                <div class="stat-label">今日</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="userCount">-</div>
+                <div class="stat-label">用户数</div>
+            </div>
+        </div>
+        
+        <!-- 操作 -->
+        <div class="action-bar">
+            <button class="action-btn btn-secondary" onclick="refreshData()">
+                🔄 刷新
+            </button>
+            <button class="action-btn btn-primary" onclick="showToast('邮件由系统自动发送，请勿手动触发'); return false;">
+                📧 发送今日汇总
+            </button>
+        </div>
+        
+        <!-- 记录列表 -->
+        <div class="record-list" id="recordList">
+            <div style="padding: 40px; text-align: center; color: #999;">加载中...</div>
+        </div>
+    </main>
+    
+    <div class="toast" id="toast"></div>
+    
+    <nav class="nav">
+        <a href="/" class="nav-item">
+            <span class="icon">🏠</span>
+            <span class="label">首页</span>
+        </a>
+        <a href="/add" class="nav-item">
+            <span class="icon">➕</span>
+            <span class="label">添加</span>
+        </a>
+        <a href="/admin" class="nav-item active">
+            <span class="icon">🔧</span>
+            <span class="label">管理</span>
+        </a>
+    </nav>
+    
+    <script>
+        let allRecords = [];
+        
+        async function loadData() {
+            try {
+                const res = await fetch('/api/records');
+                allRecords = await res.json();
+                renderData();
+            } catch (err) {
+                showToast('加载失败');
+            }
+        }
+        
+        function renderData() {
+            // 统计
+            const today = new Date().toISOString().split('T')[0];
+            const todayRecords = allRecords.filter(r => r.created_at.startsWith(today));
+            const users = new Set(allRecords.map(r => r.user_name));
+            
+            document.getElementById('totalCount').textContent = allRecords.length;
+            document.getElementById('todayCount').textContent = todayRecords.length;
+            document.getElementById('userCount').textContent = users.size;
+            
+            // 按日期分组
+            const byDate = {};
+            allRecords.forEach(r => {
+                const date = r.created_at.split(' ')[0];
+                if (!byDate[date]) byDate[date] = [];
+                byDate[date].push(r);
+            });
+            
+            const list = document.getElementById('recordList');
+            let html = '';
+            
+            Object.keys(byDate).sort().reverse().forEach(date => {
+                html += `<div class="date-group-title">📅 ${date}</div>`;
+                byDate[date].forEach(r => {
+                    const catClass = `category-${r.category}`;
+                    const catText = {breakfast: '🌅早餐', lunch: '☀️午餐', dinner: '🌙晚餐', snack: '🍰零食'}[r.category] || '🍽️';
+                    const time = r.created_at.split(' ')[1].substring(0, 5);
+                    
+                    html += `
+                        <div class="record-item">
+                            <div class="record-img">
+                                ${r.photo_path 
+                                    ? `<img src="/static/${r.photo_path}" alt="${r.food_name}">` 
+                                    : '🍽️'}
+                            </div>
+                            <div class="record-info">
+                                <div class="record-header">
+                                    <span class="record-user">${r.user_name}</span>
+                                </div>
+                                <div class="record-name">${r.food_name}</div>
+                                <div class="record-meta">
+                                    <span class="record-category ${catClass}">${catText}</span>
+                                    <span>${time}</span>
+                                    ${r.notes ? `<span>📝 ${r.notes}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="record-actions">
+                                <button class="delete-btn" onclick="deleteRecord(${r.id})" title="删除">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+            
+            if (allRecords.length === 0) {
+                html = '<div style="padding: 40px; text-align: center; color: #999;">还没有记录</div>';
+            }
+            
+            list.innerHTML = html;
+        }
+        
+        async function deleteRecord(id) {
+            if (!confirm('确定删除这条记录？')) return;
+            try {
+                const res = await fetch(`/delete/${id}`);
+                const data = await res.json();
+                if (data.success) {
+                    showToast('删除成功');
+                    allRecords = allRecords.filter(r => r.id !== id);
+                    renderData();
+                }
+            } catch (err) {
+                showToast('删除失败');
+            }
+        }
+        
+        async function sendDigest() {
+            showToast('正在发送邮件...');
+            try {
+                const res = await fetch('/api/send-digest?key=admin-secret-key', { method: 'POST' });
+                const data = await res.json();
+                showToast(data.message);
+            } catch (err) {
+                showToast('邮件发送失败');
+            }
+        }
+        
+        function refreshData() {
+            loadData();
+            showToast('已刷新');
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>

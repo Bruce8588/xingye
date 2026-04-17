@@ -1,0 +1,206 @@
+server {
+    listen 80;
+    server_name 8.129.109.139;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name 8.129.109.139;
+
+    ssl_certificate /etc/nginx/ssl/your-cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/your-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE;
+
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma "no-cache";
+    add_header Expires "0";
+
+    # ===== 导航页（根路径）=====
+    location = / {
+        root /opt/xingye/html;
+        index index.html;
+    }
+
+    # ===== 前端静态（alias 方式，精确映射到新目录）=====
+    location /daily/ {
+        alias /opt/xingye/html/investflow/;
+        index index.html;
+        try_files $uri $uri/ /daily/index.html;
+    }
+    location /trading/ {
+        alias /opt/xingye/html/trading-system/;
+        index index.html;
+        try_files $uri $uri/ /trading/index.html;
+    }
+    location /reading/ {
+        alias /opt/xingye/html/reading/;
+        index index.html;
+        try_files $uri $uri/ /reading/index.html;
+    }
+    location /xingye/ {
+        alias /opt/xingye/html/xingye/;
+        index index.html;
+        try_files $uri $uri/ /xingye/index.html;
+    }
+
+    # ===== 饮食追踪（Flask 模板，直连 5001）=====
+    location /diet/ {
+        proxy_pass http://127.0.0.1:5001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        sub_filter_types text/html application/javascript;
+        sub_filter_once off;
+        sub_filter '/api/' '/diet/api/';
+        sub_filter 'fetch("/' 'fetch("/diet/';
+        sub_filter "fetch('/" "fetch('/diet/";
+        sub_filter 'href="/' 'href="/diet/';
+        sub_filter '="/login' '="/diet/login';
+        sub_filter "='/login" "='/diet/login";
+        proxy_redirect http://localhost:5001/ http://8.129.109.139/diet/;
+    }
+
+    # ===== 心理静态页 ======
+    location /psych-schemes/ {
+        alias /opt/xingye/data/psychology/;
+        index index.html;
+        try_files $uri $uri/ /psych-schemes/index.html;
+    }
+
+    # ===== 静态资源（字体、图片等）=====
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        root /opt/xingye/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # ===== 后端 API（按项目路由）=====
+    # 每日行动 API → investflow Flask (5678)
+    location /daily/api/ {
+        proxy_pass http://127.0.0.1:5678/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+    }
+
+    # 读书 API → reading Flask (6788)
+    location /api/reading/ {
+        proxy_pass http://127.0.0.1:6788/api/reading/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+    }
+
+    # 心理 API → psychology Flask (6790)
+    location /api/psychology/ {
+        proxy_pass http://127.0.0.1:6790/api/psychology/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+    }
+
+    # 交易 API → trading-system Flask (5649)
+    location /api/ {
+        proxy_pass http://127.0.0.1:5649/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://8.129.109.139';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        proxy_redirect http://localhost:5649/ http://8.129.109.139/api/;
+    }
+
+    # 旧路径兼容
+    location = /life { return 410 "Gone"; }
+    location = /login { return 302 /diet/login; }
+}

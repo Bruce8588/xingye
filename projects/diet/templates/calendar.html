@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>日历 - 饮食记录</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 12px rgba(255, 107, 107, 0.3);
+        }
+        .header-back {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            text-decoration: none;
+        }
+        .header-title {
+            flex: 1;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            padding-right: 44px;
+        }
+        
+        .main {
+            padding: 72px 16px 80px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* 日历 */
+        .calendar {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .calendar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+        .calendar-nav button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f5f5f5;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .calendar-nav button:active {
+            background: #eee;
+        }
+        
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .weekday {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            padding: 8px 0;
+        }
+        
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #333;
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .calendar-day:hover {
+            background: #f5f5f5;
+        }
+        .calendar-day.empty {
+            cursor: default;
+        }
+        .calendar-day.today {
+            font-weight: 600;
+            color: #FF6B6B;
+        }
+        .calendar-day.has-record::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            width: 6px;
+            height: 6px;
+            background: #FF6B6B;
+            border-radius: 50%;
+        }
+        .calendar-day.selected {
+            background: #FF6B6B;
+            color: white;
+        }
+        .calendar-day.selected::after {
+            background: white;
+        }
+        
+        /* 日期记录列表 */
+        .day-records {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .day-records-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .record-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .record-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: #fafafa;
+            border-radius: 12px;
+        }
+        .record-img {
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .record-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .record-img .no-img {
+            font-size: 24px;
+        }
+        .record-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .record-name {
+            font-size: 15px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .record-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .record-category {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .category-breakfast { background: #FFF3E0; color: #FF9800; }
+        .category-lunch { background: #E8F5E9; color: #4CAF50; }
+        .category-dinner { background: #E3F2FD; color: #2196F3; }
+        .category-snack { background: #FCE4EC; color: #E91E63; }
+        .record-time {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .no-records {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-size: 14px;
+        }
+        
+        /* 底部导航 */
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+            z-index: 1000;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            text-decoration: none;
+            padding: 8px 20px;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .nav-item.active {
+            color: #FF6B6B;
+        }
+        .nav-item .icon {
+            font-size: 22px;
+        }
+        .nav-item .label {
+            font-size: 11px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="header-back">←</a>
+        <div class="header-title">📅 日历</div>
+    </header>
+    
+    <main class="main">
+        <div class="calendar">
+            <div class="calendar-header">
+                <span class="calendar-title" id="calendarTitle">2024年1月</span>
+                <div class="calendar-nav">
+                    <button id="prevMonth">‹</button>
+                    <button id="nextMonth">›</button>
+                </div>
+            </div>
+            <div class="calendar-weekdays">
+                <div class="weekday">日</div>
+                <div class="weekday">一</div>
+                <div class="weekday">二</div>
+                <div class="weekday">三</div>
+                <div class="weekday">四</div>
+                <div class="weekday">五</div>
+                <div class="weekday">六</div>
+            </div>
+            <div class="calendar-days" id="calendarDays"></div>
+        </div>
+        
+        <div class="day-records" id="dayRecords">
+            <div class="day-records-header">
+                <span>📋</span>
+                <span id="selectedDateTitle">选择日期查看记录</span>
+            </div>
+            <div class="record-list" id="recordList">
+                <div class="no-records">点击日期查看当天记录</div>
+            </div>
+        </div>
+    </main>
+    
+    <nav class="nav">
+        <a href="/" class="nav-item">
+            <span class="icon">🏠</span>
+            <span class="label">首页</span>
+        </a>
+        <a href="/calendar" class="nav-item active">
+            <span class="icon">📅</span>
+            <span class="label">日历</span>
+        </a>
+    </nav>
+    
+    <script>
+        let currentYear, currentMonth;
+        let selectedDate = null;
+        let datesWithRecords = [];
+        
+        // 初始化
+        function init() {
+            const today = new Date();
+            currentYear = today.getFullYear();
+            currentMonth = today.getMonth();
+            loadDatesWithRecords();
+            renderCalendar();
+        }
+        
+        // 加载有记录的日期
+        async function loadDatesWithRecords() {
+            try {
+                const res = await fetch('/api/dates');
+                datesWithRecords = await res.json();
+                renderCalendar();
+            } catch (err) {
+                console.error('加载日期失败', err);
+            }
+        }
+        
+        // 渲染日历
+        function renderCalendar() {
+            const title = document.getElementById('calendarTitle');
+            title.textContent = `${currentYear}年${currentMonth + 1}月`;
+            
+            const daysContainer = document.getElementById('calendarDays');
+            daysContainer.innerHTML = '';
+            
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const startWeekday = firstDay.getDay();
+            const totalDays = lastDay.getDate();
+            
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            // 空白格子
+            for (let i = 0; i < startWeekday; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'calendar-day empty';
+                daysContainer.appendChild(empty);
+            }
+            
+            // 日期格子
+            for (let day = 1; day <= totalDays; day++) {
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day';
+                dayEl.textContent = day;
+                
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                if (dateStr === todayStr) {
+                    dayEl.classList.add('today');
+                }
+                
+                if (datesWithRecords.includes(dateStr)) {
+                    dayEl.classList.add('has-record');
+                }
+                
+                if (dateStr === selectedDate) {
+                    dayEl.classList.add('selected');
+                }
+                
+                dayEl.addEventListener('click', () => selectDate(dateStr, dayEl));
+                daysContainer.appendChild(dayEl);
+            }
+        }
+        
+        // 选择日期
+        async function selectDate(dateStr, dayEl) {
+            document.querySelectorAll('.calendar-day.selected').forEach(el => el.classList.remove('selected'));
+            dayEl.classList.add('selected');
+            selectedDate = dateStr;
+            
+            const title = document.getElementById('selectedDateTitle');
+            title.textContent = dateStr;
+            
+            try {
+                const res = await fetch(`/api/records/${dateStr}`);
+                const records = await res.json();
+                
+                const list = document.getElementById('recordList');
+                if (records.length === 0) {
+                    list.innerHTML = '<div class="no-records">当天没有记录</div>';
+                } else {
+                    list.innerHTML = records.map(r => `
+                        <div class="record-item">
+                            <div class="record-img">
+                                ${r.photo_path 
+                                    ? `<img src="/static/${r.photo_path}" alt="${r.food_name}">`
+                                    : '<span class="no-img">🍽️</span>'
+                                }
+                            </div>
+                            <div class="record-info">
+                                <div class="record-name">${r.food_name}</div>
+                                <div class="record-meta">
+                                    <span class="record-category category-${r.category}">
+                                        ${r.category === 'breakfast' ? '早餐' : r.category === 'lunch' ? '午餐' : r.category === 'dinner' ? '晚餐' : '零食'}
+                                    </span>
+                                    <span class="record-time">${r.created_at.split(' ')[1].substring(0, 5)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('加载记录失败', err);
+            }
+        }
+        
+        // 月份切换
+        document.getElementById('prevMonth').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        });
+        
+        document.getElementById('nextMonth').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar();
+        });
+        
+        init();
+    </script>
+</body>
+</html>

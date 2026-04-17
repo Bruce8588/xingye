@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的饮食记录 🍽️</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        /* 顶部导航 */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            box-shadow: 0 2px 12px rgba(255, 107, 107, 0.3);
+        }
+        .header h1 {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        
+        /* 主内容 */
+        .main {
+            padding: 72px 16px 80px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* 日期分组 */
+        .date-group {
+            margin-bottom: 24px;
+        }
+        .date-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .date-header .emoji {
+            font-size: 16px;
+        }
+        
+        /* 瀑布流卡片 */
+        .waterfall {
+            column-count: 2;
+            column-gap: 12px;
+        }
+        .card {
+            break-inside: avoid;
+            margin-bottom: 12px;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .card:active {
+            transform: scale(0.98);
+        }
+        .card-img {
+            width: 100%;
+            display: block;
+            background: #fafafa;
+            min-height: 120px;
+        }
+        .card-img img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .card-no-img {
+            width: 100%;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #FFE3E3 0%, #FFF5F5 100%);
+            color: #FF6B6B;
+            font-size: 32px;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .card-user {
+            font-size: 12px;
+            color: #FF6B6B;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .card-title {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .card-category {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .category-breakfast { background: #FFF3E0; color: #FF9800; }
+        .category-lunch { background: #E8F5E9; color: #4CAF50; }
+        .category-dinner { background: #E3F2FD; color: #2196F3; }
+        .category-snack { background: #FCE4EC; color: #E91E63; }
+        .card-time {
+            font-size: 11px;
+            color: #999;
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .emoji {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        /* 底部导航 */
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+            z-index: 1000;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            text-decoration: none;
+            padding: 8px 20px;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .nav-item.active {
+            color: #FF6B6B;
+        }
+        .nav-item .icon {
+            font-size: 22px;
+        }
+        .nav-item .label {
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        /* 添加按钮 */
+        .add-btn {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
+            text-decoration: none;
+            z-index: 999;
+            transition: transform 0.2s;
+        }
+        .add-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* 删除按钮 */
+        .card-delete {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+        .card:hover .card-delete {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🍽️ {{ username }}的饮食记录</h1>
+    </header>
+    
+    <main class="main">
+        {% if records_by_date %}
+            {% for date, records in records_by_date.items() %}
+            <div class="date-group">
+                <div class="date-header">
+                    <span class="emoji">📅</span>
+                    <span>{{ date }}</span>
+                </div>
+                <div class="waterfall">
+                    {% for record in records %}
+                    <div class="card" data-id="{{ record.id }}">
+                        <button class="card-delete" onclick="deleteRecord({{ record.id }}, event)">×</button>
+                        {% if record.photo_path %}
+                        <div class="card-img">
+                            <img src="/static/{{ record.photo_path }}" alt="{{ record.food_name }}" loading="lazy">
+                        </div>
+                        {% else %}
+                        <div class="card-no-img">🍽️</div>
+                        {% endif %}
+                        <div class="card-body">
+                            <div class="card-title">{{ record.food_name }}</div>
+                            <div class="card-meta">
+                                <span class="card-category category-{{ record.category }}">
+                                    {% if record.category == 'breakfast' %}早餐
+                                    {% elif record.category == 'lunch' %}午餐
+                                    {% elif record.category == 'dinner' %}晚餐
+                                    {% else %}零食{% endif %}
+                                </span>
+                                <span class="card-time">{{ record.created_at.split(' ')[1].split(':')[0:2]|join(':') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="emoji">🍽️</div>
+                <p>还没有饮食记录</p>
+                <p>点击右下角按钮开始记录吧！</p>
+            </div>
+        {% endif %}
+    </main>
+    
+    <a href="/add" class="add-btn">+</a>
+    
+    <nav class="nav">
+        <a href="/" class="nav-item active">
+            <span class="icon">🏠</span>
+            <span class="label">首页</span>
+        </a>
+        <a href="/add" class="nav-item">
+            <span class="icon">➕</span>
+            <span class="label">记录</span>
+        </a>
+        <a href="/logout" class="nav-item">
+            <span class="icon">🚪</span>
+            <span class="label">退出</span>
+        </a>
+    </nav>
+    
+    <script>
+        function deleteRecord(id, event) {
+            event.stopPropagation();
+            if (confirm('确定要删除这条记录吗？')) {
+                fetch(`/api/records/${id}`, { method: 'DELETE' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.querySelector(`.card[data-id="${id}"]`).remove();
+                        }
+                    });
+            }
+        }
+    </script>
+</body>
+</html>
