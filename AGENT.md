@@ -50,7 +50,6 @@
 ├── ssl/               # SSL 证书
 │   ├── your-cert.pem
 │   └── your-key.pem
-└── backup/星夜/       # 旧 /root/星夜 备份（639MB）
 ```
 
 ---
@@ -110,6 +109,39 @@ curl -sI https://8.129.109.139/daily/ -k | grep HTTP
 
 ---
 
+## 💾 备份方案（⭐ 重要）
+
+### 备份结构
+```
+/backup/
+  auto/xingye/      ← 每天 3:00 自动覆盖备份，/opt/xingye/ 完整镜像（536M）
+  debug/            ← 调试产生的备份，保留3份
+  backup.log        ← 备份日志
+  backup-xingye.sh  ← 备份脚本
+
+/opt/xingye/        ← git 自动推送到 github.com:Bruce8588/xingye
+  debug/            ← 调试工作区（不在备份中）
+```
+
+### 备份脚本用法
+```bash
+# 自动备份（每天 3:00 cron 自动跑）
+bash /backup/backup-xingye.sh
+
+# 调试备份（修改前手动跑，保留3份）
+bash /backup/backup-xingye.sh --debug "修复了xxx问题"
+
+# 从备份恢复
+bash /backup/backup-xingye.sh --restore /backup/auto/xingye/
+```
+
+### 注意事项
+- 本地备份 = `/opt/xingye/` 完整镜像，只排除 `debug/` 和 `backup/` 自身
+- GitHub 推送是增量，但本地备份是全量快照
+- crontab：`0 3 * * * /backup/backup-xingye.sh >> /backup/backup.log 2>&1`
+
+---
+
 ## ⚠️ 已知陷阱
 
 ### PM2 restart 不读取新配置
@@ -157,9 +189,6 @@ Apache（httpd）可能仍在运行并抢掉 Nginx 的端口。发现异常响�
 ```bash
 systemctl stop httpd && systemctl disable httpd
 ```
-
-### 旧目录备份
-`/root/星夜/` 已删除并备份到 `/opt/xingye/backup/星夜/`（639MB）。如需恢复源码，从备份提取。
 
 ---
 
