@@ -34,6 +34,11 @@ server {
         index index.html;
         try_files $uri $uri/ /trading/index.html;
     }
+    location /trading-preview/ {
+        alias /opt/xingye/html/trading-preview/;
+        index index.html;
+        try_files $uri $uri/ /trading-preview/index.html;
+    }
     location /reading/ {
         alias /opt/xingye/html/reading/;
         index index.html;

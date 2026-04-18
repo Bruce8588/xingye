@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
-  Target, Plus, Trash2, Clock, TrendingDown, AlertTriangle,
+  Target, Plus, Trash2, Clock,
   RefreshCw, ChevronDown, ChevronUp, Check, X, TrendingUp,
-  Wallet, BarChart2, ArrowUp, ArrowDown, Layers
+  Wallet, BarChart2, Layers, Edit3, Save, XCircle, FileText, Lightbulb
 } from 'lucide-react'
 
 const API = '/api'
@@ -24,11 +24,9 @@ const ENTRY_TYPE_OPTIONS = [
 
 const EMPTY_FORM = {
   stock_name: '',
-  decision: '',
   max_risk: '',
   buy_price: '',
   stop_loss: '',
-  position_period: '',
   quantity: '',
   market_type: '',
   trade_model: '',
@@ -49,6 +47,10 @@ export default function RiskControl() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [totalCapital, setTotalCapital] = useState(100000)
+  const [editingCapital, setEditingCapital] = useState(false)
+  const [capitalInput, setCapitalInput] = useState('')
+  const [logicModal, setLogicModal] = useState({ open: false, title: '', content: '' })
+  const [hasUnsavedCapital, setHasUnsavedCapital] = useState(false)
 
   useEffect(() => {
     fetchAll()
@@ -57,17 +59,18 @@ export default function RiskControl() {
   const fetchAll = async () => {
     setLoading(true)
     try {
-      const [decRes, statsRes] = await Promise.all([
+      const [decRes, statsRes, rulesRes] = await Promise.all([
         fetch(`${API}/decisions`),
         fetch(`${API}/decisions/stats`),
         fetch(`${API}/risk-rules`),
       ])
       const decisionsData = await decRes.json()
       const statsData = await statsRes.json()
-      const rulesData = await fetch(`${API}/risk-rules`).then(r => r.json())
+      const rulesData = await rulesRes.json()
       setDecisions(decisionsData)
       setStats(statsData)
-      setTotalCapital(rulesData.total_capital || 100000)
+      setTotalCapital(statsData.total_capital || 100000)
+      setCapitalInput(String(statsData.total_capital || 100000))
     } catch (err) {
       console.error('Failed to fetch:', err)
     }
@@ -77,16 +80,49 @@ export default function RiskControl() {
   const activeDecisions = decisions.filter(d => d.status === 'active')
   const completedDecisions = decisions.filter(d => d.status === 'completed')
 
+  // 自动计算 max_risk
+  const calcMaxRisk = (buy, stop) => {
+    if (!buy || !stop || parseFloat(buy) === 0) return ''
+    const risk = ((parseFloat(buy) - parseFloat(stop)) / parseFloat(buy) * 100).toFixed(2)
+    return risk
+  }
+
+  const handleBuyPriceChange = (val) => {
+    const autoRisk = calcMaxRisk(val, form.stop_loss)
+    setForm({ ...form, buy_price: val, max_risk: autoRisk })
+  }
+
+  const handleStopLossChange = (val) => {
+    const autoRisk = calcMaxRisk(form.buy_price, val)
+    setForm({ ...form, stop_loss: val, max_risk: autoRisk })
+  }
+
+  const handleSaveCapital = async () => {
+    const val = parseFloat(capitalInput)
+    if (!val || val <= 0) return
+    try {
+      await fetch(`${API}/risk-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ total_capital: val }),
+      })
+      setTotalCapital(val)
+      setEditingCapital(false)
+      setHasUnsavedCapital(false)
+      fetchAll()
+    } catch (err) {
+      console.error('Failed to save capital:', err)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!form.stock_name) return
     try {
       const payload = {
         stock_name: form.stock_name,
-        decision: form.decision,
         max_risk: parseFloat(form.max_risk) || 0,
         buy_price: parseFloat(form.buy_price) || 0,
         stop_loss: parseFloat(form.stop_loss) || 0,
-        position_period: form.position_period,
         quantity: parseFloat(form.quantity) || 0,
         sell_price: parseFloat(form.sell_price) || 0,
         market_type: form.market_type,
@@ -140,11 +176,9 @@ export default function RiskControl() {
   const handleEdit = (decision) => {
     setForm({
       stock_name: decision.stock_name,
-      decision: decision.decision,
       max_risk: decision.max_risk || '',
       buy_price: decision.buy_price || '',
       stop_loss: decision.stop_loss || '',
-      position_period: decision.position_period || '',
       quantity: decision.quantity || '',
       market_type: decision.market_type || '',
       trade_model: decision.trade_model || '',
@@ -197,6 +231,21 @@ export default function RiskControl() {
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* 逻辑/预期弹窗 */}
+      {logicModal.open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setLogicModal({ open: false, title: '', content: '' })}>
+          <div className="bg-slate-800 rounded-xl border border-slate-600 p-6 max-w-lg w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white">{logicModal.title}</h3>
+              <button onClick={() => setLogicModal({ open: false, title: '', content: '' })} className="text-slate-400 hover:text-white">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <p className="text-slate-300 whitespace-pre-wrap text-sm leading-relaxed">{logicModal.content || '暂无内容'}</p>
+          </div>
+        </div>
+      )}
+
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -220,12 +269,33 @@ export default function RiskControl() {
       {/* 账户概览 */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard
-            icon={<Wallet size={16} />}
-            label="总资金"
-            value={`¥${stats.total_capital.toLocaleString()}`}
-            color="text-white"
-          />
+          {/* 总资金（可编辑） */}
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+              <Wallet size={16} />
+              <span>总资金</span>
+              <button onClick={() => { setEditingCapital(true); setCapitalInput(String(totalCapital)) }} className="ml-auto text-indigo-400 hover:text-indigo-300">
+                <Edit3 size={13} />
+              </button>
+            </div>
+            {editingCapital ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={capitalInput}
+                  onChange={(e) => { setCapitalInput(e.target.value); setHasUnsavedCapital(true) }}
+                  className="w-full bg-slate-700 text-white text-xl font-bold rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                />
+                <button onClick={handleSaveCapital} className="text-green-400 hover:text-green-300"><Check size={18} /></button>
+                <button onClick={() => { setEditingCapital(false); setCapitalInput(String(totalCapital)); setHasUnsavedCapital(false) }} className="text-slate-400 hover:text-white"><X size={18} /></button>
+              </div>
+            ) : (
+              <div className={`text-xl font-bold ${hasUnsavedCapital ? 'text-yellow-400' : 'text-white'}`}>
+                ¥{totalCapital.toLocaleString()}
+              </div>
+            )}
+          </div>
           <StatCard
             icon={<BarChart2 size={16} />}
             label="资金占用"
@@ -257,7 +327,7 @@ export default function RiskControl() {
             {editingId ? '编辑交易' : '新交易记录'}
           </h3>
           <div className="space-y-4">
-            {/* 基本信息 */}
+            {/* 股票名称 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-slate-400 text-sm mb-1">股票名称 *</label>
@@ -268,42 +338,86 @@ export default function RiskControl() {
                   className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">市场环境</label>
-                <select
-                  value={form.market_type}
-                  onChange={(e) => setForm({ ...form, market_type: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">选择市场环境</option>
-                  {MARKET_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+            </div>
+
+            {/* 市场环境 - 点击选择 */}
+            <div>
+              <label className="block text-slate-400 text-sm mb-2">市场环境</label>
+              <div className="flex gap-3">
+                {MARKET_TYPE_OPTIONS.map(o => (
+                  <label
+                    key={o.value}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border transition-colors ${
+                      form.market_type === o.value
+                        ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                        : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="market_type"
+                      value={o.value}
+                      checked={form.market_type === o.value}
+                      onChange={() => setForm({ ...form, market_type: o.value })}
+                      className="hidden"
+                    />
+                    {o.label}
+                  </label>
+                ))}
               </div>
             </div>
 
-            {/* 交易模型 & 买入类型 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">交易模型</label>
-                <select
-                  value={form.trade_model}
-                  onChange={(e) => setForm({ ...form, trade_model: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">选择模型</option>
-                  {TRADE_MODEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+            {/* 交易模型 - 点击选择 */}
+            <div>
+              <label className="block text-slate-400 text-sm mb-2">交易模型</label>
+              <div className="flex gap-3">
+                {TRADE_MODEL_OPTIONS.map(o => (
+                  <label
+                    key={o.value}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border transition-colors ${
+                      form.trade_model === o.value
+                        ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                        : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="trade_model"
+                      value={o.value}
+                      checked={form.trade_model === o.value}
+                      onChange={() => setForm({ ...form, trade_model: o.value })}
+                      className="hidden"
+                    />
+                    {o.label}
+                  </label>
+                ))}
               </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">买入方式</label>
-                <select
-                  value={form.entry_type}
-                  onChange={(e) => setForm({ ...form, entry_type: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">选择买入方式</option>
-                  {ENTRY_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+            </div>
+
+            {/* 买入方式 - 点击选择 */}
+            <div>
+              <label className="block text-slate-400 text-sm mb-2">买入方式</label>
+              <div className="flex gap-3">
+                {ENTRY_TYPE_OPTIONS.map(o => (
+                  <label
+                    key={o.value}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border transition-colors ${
+                      form.entry_type === o.value
+                        ? (o.value === 'high_entry' ? 'bg-orange-500/20 border-orange-500/50 text-orange-300' : 'bg-green-500/20 border-green-500/50 text-green-300')
+                        : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="entry_type"
+                      value={o.value}
+                      checked={form.entry_type === o.value}
+                      onChange={() => setForm({ ...form, entry_type: o.value })}
+                      className="hidden"
+                    />
+                    {o.label}
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -314,7 +428,7 @@ export default function RiskControl() {
                 <input
                   type="number" step="0.01"
                   value={form.buy_price}
-                  onChange={(e) => setForm({ ...form, buy_price: e.target.value })}
+                  onChange={(e) => handleBuyPriceChange(e.target.value)}
                   placeholder="如：12.50"
                   className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -334,19 +448,21 @@ export default function RiskControl() {
                 <input
                   type="number" step="0.01"
                   value={form.stop_loss}
-                  onChange={(e) => setForm({ ...form, stop_loss: e.target.value })}
+                  onChange={(e) => handleStopLossChange(e.target.value)}
                   placeholder="如：11.50"
                   className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 text-sm mb-1">最大风险 (%)</label>
+                <label className="block text-slate-400 text-sm mb-1">最大风险（%）
+                  <span className="text-slate-500 text-xs ml-1">（自动计算）</span>
+                </label>
                 <input
-                  type="number"
+                  type="number" step="0.01"
                   value={form.max_risk}
-                  onChange={(e) => setForm({ ...form, max_risk: e.target.value })}
-                  placeholder="如：6"
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  readOnly
+                  placeholder="自动计算"
+                  className="w-full bg-slate-700/50 text-slate-400 rounded px-3 py-2 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -374,7 +490,7 @@ export default function RiskControl() {
 
             {/* 预期 */}
             <div>
-              <label className="block text-slate-400 text-sm mb-1">预期</label>
+              <label className="block text-slate-400 text-sm mb-1">交易预期</label>
               <textarea
                 value={form.expectation}
                 onChange={(e) => setForm({ ...form, expectation: e.target.value })}
@@ -384,29 +500,7 @@ export default function RiskControl() {
               />
             </div>
 
-            {/* 持仓时长 & 决策 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">持仓时长</label>
-                <input
-                  value={form.position_period}
-                  onChange={(e) => setForm({ ...form, position_period: e.target.value })}
-                  placeholder="如：3个月"
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">决策备注</label>
-                <input
-                  value={form.decision}
-                  onChange={(e) => setForm({ ...form, decision: e.target.value })}
-                  placeholder="简要备注..."
-                  className="w-full bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            {/* 完成交易 - 卖出价格 */}
+            {/* 卖出价格（编辑时） */}
             {editingId && (
               <div>
                 <label className="block text-slate-400 text-sm mb-1">卖出价格（标记完成时填写）</label>
@@ -467,6 +561,7 @@ export default function RiskControl() {
             onDelete={() => handleDelete(d.id)}
             pnlColor={pnlColor}
             formatDate={formatDate}
+            onShowLogic={(title, content) => setLogicModal({ open: true, title, content })}
           />
         ))}
       </div>
@@ -497,6 +592,7 @@ export default function RiskControl() {
                   onDelete={() => handleDelete(d.id)}
                   pnlColor={pnlColor}
                   formatDate={formatDate}
+                  onShowLogic={(title, content) => setLogicModal({ open: true, title, content })}
                   isCompleted
                 />
               ))}
@@ -530,7 +626,7 @@ function CalcItem({ label, value }) {
   )
 }
 
-function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, onEdit, onDelete, pnlColor, formatDate, isCompleted }) {
+function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, onEdit, onDelete, pnlColor, formatDate, onShowLogic, isCompleted }) {
   const buyAmount = (d.buy_price || 0) * (d.quantity || 0)
   const riskAmount = Math.max(0, ((d.buy_price || 0) - (d.stop_loss || 0)) * (d.quantity || 0))
   const riskPercent = totalCapital > 0 ? (riskAmount / totalCapital * 100).toFixed(2) : '0'
@@ -539,9 +635,9 @@ function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, 
   const pnlPercent = (d.final_pnl_percent || 0)
   const finalPnlColor = pnlColor(pnl)
 
-  const marketLabel = MARKET_TYPE_OPTIONS.find(o => o.value === d.market_type)?.label || d.market_type
-  const modelLabel = TRADE_MODEL_OPTIONS.find(o => o.value === d.trade_model)?.label || d.trade_model
-  const entryLabel = ENTRY_TYPE_OPTIONS.find(o => o.value === d.entry_type)?.label || d.entry_type
+  const marketLabel = MARKET_TYPE_OPTIONS.find(o => o.value === d.market_type)?.label || ''
+  const modelLabel = TRADE_MODEL_OPTIONS.find(o => o.value === d.trade_model)?.label || ''
+  const entryLabel = ENTRY_TYPE_OPTIONS.find(o => o.value === d.entry_type)?.label || ''
 
   return (
     <div className={`bg-slate-800 rounded-lg border transition-colors ${isCompleted ? 'border-slate-700 opacity-80' : 'border-slate-700 hover:border-indigo-500'}`}>
@@ -606,27 +702,33 @@ function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, 
           </div>
         )}
 
+        {/* 买入逻辑 & 预期按钮（始终显示） */}
+        {(d.entry_logic || d.expectation) && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {d.entry_logic && (
+              <button
+                onClick={() => onShowLogic('买入逻辑', d.entry_logic)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+              >
+                <FileText size={13} />
+                买入逻辑
+              </button>
+            )}
+            {d.expectation && (
+              <button
+                onClick={() => onShowLogic('交易预期', d.expectation)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+              >
+                <Lightbulb size={13} />
+                交易预期
+              </button>
+            )}
+          </div>
+        )}
+
         {/* 展开详情 */}
         {expanded && (
           <div className="border-t border-slate-700 pt-4 mt-2 space-y-4">
-            {/* 买入逻辑 & 预期 */}
-            {(d.entry_logic || d.expectation) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {d.entry_logic && (
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">买入逻辑</div>
-                    <div className="text-sm text-slate-300">{d.entry_logic}</div>
-                  </div>
-                )}
-                {d.expectation && (
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">预期</div>
-                    <div className="text-sm text-slate-300">{d.expectation}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* 完整计算 */}
             <div className="bg-slate-700/40 rounded p-3">
               <div className="text-xs text-slate-500 mb-2">风险计算</div>
@@ -642,11 +744,10 @@ function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, 
             {isCompleted && d.sell_price && (
               <div className="bg-slate-700/40 rounded p-3">
                 <div className="text-xs text-slate-500 mb-2">最终结果</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <CalcItem label="卖出价格" value={`¥${d.sell_price}`} />
                   <CalcItem label="盈亏金额" value={`${pnl >= 0 ? '+' : ''}¥${pnl.toFixed(2)}`} />
                   <CalcItem label="盈亏比例" value={`${pnlPercent >= 0 ? '+' : ''}${pnlPercent}%`} />
-                  <CalcItem label="持仓时长" value={d.position_period || '—'} />
                 </div>
               </div>
             )}
