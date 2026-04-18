@@ -131,6 +131,25 @@ class Decision(Base):
     stop_loss = Column(Float, default=0)
     position_period = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Existing columns from DB (may not be in model yet)
+    buy_amount = Column(Float, default=0)
+    buy_shares = Column(Float, default=0)
+    # New trading fields
+    quantity = Column(Float, default=0)          # 买入数量
+    sell_price = Column(Float, default=0)        # 卖出价格
+    market_type = Column(String(20))             # high_vol / low_vol
+    trade_model = Column(String(50))             # double_support / fall_rebound
+    entry_type = Column(String(20))              # high_entry / low_entry
+    entry_logic = Column(Text)                   # 买入逻辑
+    expectation = Column(Text)                   # 预期
+    status = Column(String(20), default='active') # active / completed
+    # Auto-calculated fields (stored for convenience)
+    risk_amount = Column(Float, default=0)       # 单笔风险金额
+    risk_percent = Column(Float, default=0)      # 单笔风险比例
+    capital_percent = Column(Float, default=0)   # 占总资金比例
+    final_pnl_percent = Column(Float, default=0) # 最终盈亏比例
+    final_pnl = Column(Float, default=0)         # 最终盈亏金额
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class MarketRecord(Base):
     __tablename__ = 'market_records'
@@ -898,11 +917,37 @@ def delete_trading_review(id):
     return jsonify({'error': 'Not found'}), 404
 
 # --- Decisions ---
-@app.route('/api/decisions', methods=['GET'])
-def get_decisions():
-    session = Session()
-    decisions = session.query(Decision).order_by(Decision.created_at.desc()).all()
-    result = [{
+def _calc_decision_fields(d, total_capital):
+    """计算自动字段"""
+    buy_price = d.buy_price or 0
+    quantity = d.quantity or 0
+    stop_loss = d.stop_loss or 0
+    sell_price = d.sell_price or 0
+
+    buy_amount = buy_price * quantity
+    risk_amount = max(0, (buy_price - stop_loss) * quantity)
+    risk_percent = round(risk_amount / total_capital * 100, 2) if total_capital > 0 else 0
+    capital_percent = round(buy_amount / total_capital * 100, 2) if total_capital > 0 else 0
+
+    if d.status == 'completed' and sell_price > 0 and buy_price > 0:
+        final_pnl = (sell_price - buy_price) * quantity
+        final_pnl_percent = round((sell_price - buy_price) / buy_price * 100, 2)
+    else:
+        final_pnl = 0
+        final_pnl_percent = 0
+
+    return {
+        'buy_amount': round(buy_amount, 2),
+        'risk_amount': round(risk_amount, 2),
+        'risk_percent': risk_percent,
+        'capital_percent': capital_percent,
+        'final_pnl': round(final_pnl, 2),
+        'final_pnl_percent': final_pnl_percent,
+    }
+
+def _decision_to_dict(d, total_capital=100000):
+    calced = _calc_decision_fields(d, total_capital)
+    return {
         'id': d.id,
         'stock_name': d.stock_name,
         'decision': d.decision,
@@ -910,8 +955,30 @@ def get_decisions():
         'buy_price': d.buy_price,
         'stop_loss': d.stop_loss,
         'position_period': d.position_period,
-        'created_at': d.created_at.isoformat()
-    } for d in decisions]
+        'created_at': d.created_at.isoformat() if d.created_at else None,
+        'updated_at': d.updated_at.isoformat() if d.updated_at else None,
+        'buy_amount': d.buy_amount or calced['buy_amount'],
+        'buy_shares': d.buy_shares or d.quantity,
+        'quantity': d.quantity,
+        'sell_price': d.sell_price,
+        'market_type': d.market_type or '',
+        'trade_model': d.trade_model or '',
+        'entry_type': d.entry_type or '',
+        'entry_logic': d.entry_logic or '',
+        'expectation': d.expectation or '',
+        'status': d.status or 'active',
+        'risk_amount': d.risk_amount or calced['risk_amount'],
+        'risk_percent': d.risk_percent or calced['risk_percent'],
+        'capital_percent': d.capital_percent or calced['capital_percent'],
+        'final_pnl_percent': d.final_pnl_percent if d.final_pnl_percent != 0 else calced['final_pnl_percent'],
+        'final_pnl': d.final_pnl or calced['final_pnl'],
+    }
+
+@app.route('/api/decisions', methods=['GET'])
+def get_decisions():
+    session = Session()
+    decisions = session.query(Decision).order_by(Decision.created_at.desc()).all()
+    result = [_decision_to_dict(d) for d in decisions]
     session.close()
     return jsonify(result)
 
@@ -919,28 +986,63 @@ def get_decisions():
 def create_decision():
     data = request.json
     session = Session()
+    # Get total capital from risk_rules
+    total_capital = 100000
+    rules = session.query(RiskRule).all()
+    for r in rules:
+        if r.name == 'total_capital':
+            total_capital = r.value
+    session.close()
+
     decision = Decision(
         stock_name=data['stock_name'],
         decision=data['decision'],
         max_risk=data.get('max_risk', 0),
         buy_price=data.get('buy_price', 0),
         stop_loss=data.get('stop_loss', 0),
-        position_period=data.get('position_period', '')
+        position_period=data.get('position_period', ''),
+        quantity=data.get('quantity', 0),
+        sell_price=data.get('sell_price', 0),
+        market_type=data.get('market_type', ''),
+        trade_model=data.get('trade_model', ''),
+        entry_type=data.get('entry_type', ''),
+        entry_logic=data.get('entry_logic', ''),
+        expectation=data.get('expectation', ''),
+        status=data.get('status', 'active'),
     )
     session.add(decision)
     session.commit()
-    result = {
-        'id': decision.id,
-        'stock_name': decision.stock_name,
-        'decision': decision.decision,
-        'max_risk': decision.max_risk,
-        'buy_price': decision.buy_price,
-        'stop_loss': decision.stop_loss,
-        'position_period': decision.position_period,
-        'created_at': decision.created_at.isoformat()
-    }
+    result = _decision_to_dict(decision, total_capital)
     session.close()
     return jsonify(result), 201
+
+@app.route('/api/decisions/<int:id>', methods=['PUT'])
+def update_decision(id):
+    data = request.json
+    session = Session()
+    decision = session.query(Decision).get(id)
+    if not decision:
+        session.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    # Get total capital
+    total_capital = 100000
+    rules = session.query(RiskRule).all()
+    for r in rules:
+        if r.name == 'total_capital':
+            total_capital = r.value
+
+    # Update fields
+    for field in ['stock_name', 'decision', 'max_risk', 'buy_price', 'stop_loss',
+                  'position_period', 'quantity', 'sell_price', 'market_type',
+                  'trade_model', 'entry_type', 'entry_logic', 'expectation', 'status']:
+        if field in data:
+            setattr(decision, field, data[field])
+
+    session.commit()
+    result = _decision_to_dict(decision, total_capital)
+    session.close()
+    return jsonify(result)
 
 @app.route('/api/decisions/<int:id>', methods=['DELETE'])
 def delete_decision(id):
@@ -953,6 +1055,50 @@ def delete_decision(id):
         return jsonify({'success': True})
     session.close()
     return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/decisions/stats', methods=['GET'])
+def get_decision_stats():
+    """账户统计"""
+    session = Session()
+    decisions = session.query(Decision).all()
+
+    # Get total capital
+    total_capital = 100000
+    rules = session.query(RiskRule).all()
+    for r in rules:
+        if r.name == 'total_capital':
+            total_capital = r.value
+
+    active = [d for d in decisions if d.status == 'active']
+    completed = [d for d in decisions if d.status == 'completed']
+
+    # Calculate active positions
+    active_capital = sum((d.buy_price or 0) * (d.quantity or 0) for d in active)
+    active_risk = sum(max(0, ((d.buy_price or 0) - (d.stop_loss or 0)) * (d.quantity or 0)) for d in active)
+
+    # Win rate
+    win_count = sum(1 for d in completed if (d.final_pnl or (d.sell_price or 0) - (d.buy_price or 0) * (d.quantity or 0)) > 0)
+    total_completed = len(completed)
+    win_rate = round(win_count / total_completed * 100, 1) if total_completed > 0 else 0
+
+    # Total P&L
+    total_pnl = sum(d.final_pnl or 0 for d in completed)
+    total_invested = sum((d.buy_price or 0) * (d.quantity or 0) for d in completed)
+    total_return = round(total_pnl / total_invested * 100, 2) if total_invested > 0 else 0
+
+    session.close()
+    return jsonify({
+        'total_capital': total_capital,
+        'active_capital': round(active_capital, 2),
+        'available_capital': round(total_capital - active_capital, 2),
+        'capital_utilization': round(active_capital / total_capital * 100, 1) if total_capital > 0 else 0,
+        'active_count': len(active),
+        'completed_count': total_completed,
+        'win_count': win_count,
+        'win_rate': win_rate,
+        'total_pnl': round(total_pnl, 2),
+        'total_return': total_return,
+    })
 
 # --- Market Records ---
 @app.route('/api/market-records', methods=['GET'])
