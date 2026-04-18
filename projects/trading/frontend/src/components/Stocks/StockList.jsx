@@ -1,9 +1,30 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Save, X, Database, Settings, ArrowLeft, ChevronRight, Trash, Search, Check } from 'lucide-react'
+import { Plus, Edit2, Trash2, Save, X, Database, Settings, ArrowLeft, ChevronRight, Trash, Search, Check, ArrowUpRight } from 'lucide-react'
 
 const API = '/api'
+const TREND_COLUMNS = [
+  { key: 'up', name: '上升趋势' },
+  { key: 'up_natural', name: '自然回撤' },
+  { key: 'up_rally', name: '回升' },
+  { key: 'up_secondary', name: '次级回撤' },
+  { key: 'up_break', name: '上升破坏' },
+  { key: 'down', name: '下跌趋势' },
+  { key: 'down_natural', name: '自然回升' },
+  { key: 'down_rally', name: '回撤' },
+  { key: 'down_secondary', name: '次级回升' },
+  { key: 'down_break', name: '下跌破坏' },
+]
 
-export default function StockList({ initialGroupId = null, initialStockId = null }) {
+function getStockTrend(record) {
+  if (!record || !record.data) return null
+  for (const col of TREND_COLUMNS) {
+    const val = record.data[col.key]
+    if (val && String(val).trim() !== '') return col
+  }
+  return null
+}
+
+export default function StockList({ initialGroupId = null, initialStockId = null, onNavigate }) {
   const [stocks, setStocks] = useState([])
   const [logicGroups, setLogicGroups] = useState([])
   const [customFields, setCustomFields] = useState([])
@@ -14,9 +35,11 @@ export default function StockList({ initialGroupId = null, initialStockId = null
   const [editingFieldId, setEditingFieldId] = useState(null)
   const [selectedStock, setSelectedStock] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [groupFilter, setGroupFilter] = useState('all') // 新增：分组筛选
   const [groupPickerStock, setGroupPickerStock] = useState(null)
   const [groupPickerSelected, setGroupPickerSelected] = useState([])
   const [inlineEdit, setInlineEdit] = useState({ field: null, value: '' })
+  const [marketRecords, setMarketRecords] = useState([]) // 新增：行情记录（含走势）
   const [stockForm, setStockForm] = useState({
     name: '',
     code: '',
@@ -38,7 +61,17 @@ export default function StockList({ initialGroupId = null, initialStockId = null
   }, [initialStockId, stocks])
 
   const fetchAll = async () => {
-    await Promise.all([fetchStocks(), fetchLogicGroups(), fetchCustomFields()])
+    await Promise.all([fetchStocks(), fetchLogicGroups(), fetchCustomFields(), fetchMarketRecords()])
+  }
+
+  const fetchMarketRecords = async () => {
+    try {
+      const res = await fetch(`${API}/market-records`)
+      const data = await res.json()
+      setMarketRecords(data)
+    } catch (err) {
+      console.error('Failed to fetch market records:', err)
+    }
   }
 
   const fetchStocks = async () => {
@@ -320,9 +353,10 @@ export default function StockList({ initialGroupId = null, initialStockId = null
     setInlineEdit({ field: null, value: '' })
   }
 
-  // Filter stocks by group if initialGroupId is set, then by search query
+  // Filter stocks by group filter + search query
+  const effectiveGroupFilter = initialGroupId ? initialGroupId : groupFilter
   const displayedStocks = stocks
-    .filter(s => !initialGroupId || s.logic_group_id === initialGroupId)
+    .filter(s => !effectiveGroupFilter || effectiveGroupFilter === 'all' || s.logic_group_id === effectiveGroupFilter)
     .filter(s => {
       if (!searchQuery.trim()) return true
       const q = searchQuery.toLowerCase()
@@ -532,70 +566,95 @@ export default function StockList({ initialGroupId = null, initialStockId = null
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">
+      {/* 第一行：标题 + 搜索框 + 按钮 */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold text-white shrink-0">
           {initialGroupId ? `${getGroupById(initialGroupId)?.name || '分组'} - 股票` : '股票管理'}
           {searchQuery && <span className="text-lg font-normal text-slate-400 ml-3">（{displayedStocks.length} 只）</span>}
         </h2>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <div className="relative w-64">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索名称或代码..."
-              className="bg-slate-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 placeholder-slate-500"
+              className="bg-slate-700 text-white pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full placeholder-slate-500"
             />
           </div>
-          <div className="flex gap-2">
           <button
             onClick={() => setShowFieldForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+            className="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-indigo-500/50 text-slate-300 hover:text-white text-sm font-medium transition-all shrink-0"
           >
-            <Settings size={18} />
             字段设置
           </button>
           <button
             onClick={() => setShowStockForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+            className="px-5 py-2 rounded-xl text-white text-sm font-semibold transition-all hover:-translate-y-0.5 shrink-0"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.4)'}
           >
-            <Plus size={18} />
             添加股票
           </button>
         </div>
-        </div>
       </div>
 
-      {/* Custom Fields Section */}
-      <div className="mb-6 bg-slate-800 rounded-lg p-4 border border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-white">自定义字段</h3>
-          <span className="text-sm text-slate-400">用于记录股票的各类信息</span>
+      {/* 第二行：分组标签栏 */}
+      {!initialGroupId && (
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <button
+            onClick={() => setGroupFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${groupFilter === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'}`}
+          >
+            全部
+          </button>
+          {logicGroups.map(g => (
+            <button
+              key={g.id}
+              onClick={() => setGroupFilter(g.id)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={{
+                backgroundColor: groupFilter === g.id ? g.color : g.color + '20',
+                color: groupFilter === g.id ? '#fff' : g.color,
+                boxShadow: groupFilter === g.id ? `0 0 8px ${g.color}50` : 'none',
+              }}
+            >
+              {g.name}
+            </button>
+          ))}
         </div>
-        {customFields.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {customFields.map((field) => (
-              <div
-                key={field.id}
-                className="flex items-center gap-2 px-3 py-1 bg-slate-700 rounded-full"
-              >
-                <span className="text-sm text-slate-200">{field.name}</span>
-                <span className="text-xs text-slate-500">({field.field_type})</span>
-                <button onClick={() => startEditField(field)} className="text-slate-400 hover:text-indigo-400">
-                  <Edit2 size={12} />
-                </button>
-                <button onClick={() => handleDeleteField(field.id)} className="text-slate-400 hover:text-red-400">
-                  <X size={12} />
-                </button>
+      )}
+
+      {/* 第三行：自定义字段管理（点击字段设置时展开） */}
+      {showFieldForm && (
+        <div className="mb-4 bg-slate-800 rounded-lg p-4 border border-slate-700">
+          {customFields.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-white">已添加的字段</h3>
+                <span className="text-sm text-slate-400">用于记录股票的各类信息</span>
               </div>
-            ))}
-          </div>
-        )}
-        {customFields.length === 0 && (
-          <p className="text-sm text-slate-500 mb-4">暂无自定义字段，点击下方添加</p>
-        )}
-        {showFieldForm && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {customFields.map((field) => (
+                  <div
+                    key={field.id}
+                    className="flex items-center gap-2 px-3 py-1 bg-slate-700 rounded-full"
+                  >
+                    <span className="text-sm text-slate-200">{field.name}</span>
+                    <span className="text-xs text-slate-500">({field.field_type})</span>
+                    <button onClick={() => startEditField(field)} className="text-slate-400 hover:text-indigo-400">
+                      <Edit2 size={12} />
+                    </button>
+                    <button onClick={() => handleDeleteField(field.id)} className="text-slate-400 hover:text-red-400">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <div className="border-t border-slate-700 pt-4">
             <div className="flex gap-4">
               <input
@@ -625,8 +684,8 @@ export default function StockList({ initialGroupId = null, initialStockId = null
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Stock Form Modal */}
       {showStockForm && (
@@ -794,67 +853,114 @@ export default function StockList({ initialGroupId = null, initialStockId = null
       )}
 
       {/* Stock Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {displayedStocks.map((stock) => {
           const group = getGroupById(stock.logic_group_id)
+          const accentColor = group?.color || '#6366f1'
+          const stockRecords = marketRecords.filter(r => r.stock_id === stock.id)
+          const latestRecord = stockRecords.length > 0 ? stockRecords[0] : null
+          const trend = getStockTrend(latestRecord)
           return (
             <div
               key={stock.id}
               onClick={() => setSelectedStock(stock)}
-              className="bg-slate-800 rounded-xl border border-slate-700 p-5 cursor-pointer hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/10 transition-all group"
+              className="relative rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-1 group"
+              style={{
+                background: `linear-gradient(145deg, #1e293b 0%, #151d2e 100%)`,
+                borderColor: '#334155',
+                boxShadow: '0 4px 16px -4px rgba(0,0,0,0.3)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = accentColor + '99'
+                e.currentTarget.style.boxShadow = `0 8px 32px -4px ${accentColor}30`
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#334155'
+                e.currentTarget.style.boxShadow = '0 4px 16px -4px rgba(0,0,0,0.3)'
+              }}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-white text-lg group-hover:text-indigo-400 transition-colors">
-                    {stock.name}
-                  </h3>
-                  {stock.code && <span className="text-xs text-slate-500">{stock.code}</span>}
-                </div>
-                <ChevronRight size={18} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
-              </div>
-              
-              {/* Group tags */}
-              <div className="flex flex-wrap gap-1 mb-3">
-                {group ? (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm cursor-pointer hover:opacity-80"
-                    style={{ backgroundColor: group.color + '30', color: group.color }}
-                    onClick={(e) => openGroupPicker(stock, e)}
-                    title="点击编辑分组"
-                  >
-                    {group.name}
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm cursor-pointer bg-slate-700 text-slate-400 hover:bg-slate-600"
-                    onClick={(e) => openGroupPicker(stock, e)}
-                    title="点击添加分组"
-                  >
-                    + 添加分组
-                  </span>
-                )}
-              </div>
+              {/* Top accent bar */}
+              <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}60)` }} />
 
-              {/* Show custom fields as preview */}
-              {customFields.length > 0 && (
-                <div className="space-y-2">
-                  {customFields.slice(0, 3).map((field) => (
-                    <div key={field.id} className="flex justify-between text-sm">
-                      <span className="text-slate-500">{field.name}</span>
-                      <span className="text-slate-300 font-medium">{stock.field_values[field.id] || '-'}</span>
-                    </div>
-                  ))}
-                  {customFields.length > 3 && (
-                    <div className="text-xs text-slate-500 text-center">
-                      +{customFields.length - 3} 更多
-                    </div>
+              <div className="p-5">
+                {/* Header: name + code */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-white text-xl leading-tight group-hover:text-indigo-300 transition-colors">
+                      {stock.name}
+                    </h3>
+                    {stock.code && <span className="text-xs text-slate-500 font-mono mt-0.5 block">{stock.code}</span>}
+                  </div>
+                  {/* Trend badge (if exists) */}
+                  {trend && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (onNavigate) onNavigate('market-records', { stockId: stock.id, stockName: stock.name })
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all hover:scale-105"
+                      style={{
+                        backgroundColor: trend.key.startsWith('up') ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                        color: trend.key.startsWith('up') ? '#22c55e' : '#ef4444',
+                        border: `1px solid ${trend.key.startsWith('up') ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: trend.key.startsWith('up') ? '#22c55e' : '#ef4444' }} />
+                      {trend.name}
+                    </button>
                   )}
                 </div>
-              )}
+
+                {/* Group tag */}
+                <div className="mb-4">
+                  {group ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-opacity hover:opacity-80"
+                      style={{ backgroundColor: group.color + '18', color: group.color, border: `1px solid ${group.color}35` }}
+                      onClick={(e) => openGroupPicker(stock, e)}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color, boxShadow: `0 0 4px ${group.color}` }} />
+                      {group.name}
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-slate-500 cursor-pointer bg-slate-800 border border-dashed border-slate-700 hover:border-slate-600 transition-colors"
+                      onClick={(e) => openGroupPicker(stock, e)}
+                    >
+                      + 添加分组
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer actions */}
+                <div className="flex items-center justify-end gap-1 mt-4 pt-3 border-t border-slate-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openGroupPicker(stock, e) }}
+                    className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-md hover:bg-indigo-500/10 transition-colors"
+                    title="编辑分组"
+                  >
+                    <Settings size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startEditStock(stock) }}
+                    className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-md hover:bg-indigo-500/10 transition-colors"
+                    title="编辑股票"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteStock(stock.id) }}
+                    className="p-1.5 text-slate-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors"
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           )
         })}
-        
+
         {displayedStocks.length === 0 && (
           <div className="col-span-full text-center text-slate-500 py-12">
             <Database size={48} className="mx-auto mb-4 opacity-50" />

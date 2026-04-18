@@ -308,7 +308,6 @@ function InboxSidebar({ open, onClose, todos, onAdd, onToggle, onMoveToday, onDe
 }
 
 // ─── 复盘侧边栏 ───
-// ─── 复盘侧边栏 ───
 function ReviewSidebar({ open, onClose }) {
   const todayStr = new Date().toISOString().split('T')[0]
   const [reviewDate, setReviewDate] = useState(todayStr)
@@ -321,6 +320,20 @@ function ReviewSidebar({ open, onClose }) {
   const [recordDates, setRecordDates] = useState([])
   const [analysis, setAnalysis] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState(null)
+
+  // Auto-resize textarea
+  const contentRef = useRef(null)
+  const planRef = useRef(null)
+
+  function autoResize(el) {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+
+  useEffect(() => { autoResize(contentRef.current) }, [content])
+  useEffect(() => { autoResize(planRef.current) }, [tomorrowPlan])
 
   function moodColor(v) {
     if (v <= 3) return '#E53E3E'
@@ -370,14 +383,24 @@ function ReviewSidebar({ open, onClose }) {
     if (open) loadData(reviewDate)
   }, [open, reviewDate])
 
-  async function handleSave() {
-    setSaving(true)
+  async function handleSave(silent = false) {
+    if (!silent) setSaving(true)
     try {
-      await apiPut('/review', { content, tomorrow_plan: tomorrowPlan, mood, energy, tags })
+      await apiPut(`/reviews/${reviewDate}`, { content, tomorrow_plan: tomorrowPlan, mood, energy, tags })
       await loadData(reviewDate)
-      alert('复盘已保存 ✓')
-    } catch (e) { console.error(e) } finally { setSaving(false) }
+      if (!silent) alert('复盘已保存 ✓')
+      setLastSaved(new Date())
+    } catch (e) { console.error(e) } finally { if (!silent) setSaving(false) }
   }
+
+  // Auto-save on change (debounced 1.5s)
+  useEffect(() => {
+    if (!reviewDate) return
+    const timer = setTimeout(() => {
+      handleSave(true)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [content, tomorrowPlan, mood, energy, tags])
 
   function addTag(t) {
     if (t && !tags.includes(t)) setTags([...tags, t])
@@ -479,12 +502,13 @@ function ReviewSidebar({ open, onClose }) {
           <div>
             <div className="text-[0.7rem] font-semibold uppercase tracking-wide mb-2" style={{ color: '#7A5030' }}>📝 今日总结</div>
             <textarea
+              ref={contentRef}
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="今天做了什么？有哪些收获？"
-              rows={3}
-              className="w-full px-3 py-2 rounded-xl text-[0.875rem] resize-none focus:outline-none"
-              style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)', color: '#3D2517' }}
+              rows={1}
+              className="w-full px-3 py-2 rounded-xl text-[0.875rem] focus:outline-none overflow-hidden"
+              style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)', color: '#3D2517', minHeight: '60px', resize: 'none' }}
             />
           </div>
 
@@ -492,12 +516,13 @@ function ReviewSidebar({ open, onClose }) {
           <div>
             <div className="text-[0.7rem] font-semibold uppercase tracking-wide mb-2" style={{ color: '#7A5030' }}>🚀 明日计划</div>
             <textarea
+              ref={planRef}
               value={tomorrowPlan}
               onChange={e => setTomorrowPlan(e.target.value)}
               placeholder="明天要做什么？"
-              rows={2}
-              className="w-full px-3 py-2 rounded-xl text-[0.875rem] resize-none focus:outline-none"
-              style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)', color: '#3D2517' }}
+              rows={1}
+              className="w-full px-3 py-2 rounded-xl text-[0.875rem] focus:outline-none overflow-hidden"
+              style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)', color: '#3D2517', minHeight: '44px', resize: 'none' }}
             />
           </div>
 
@@ -588,17 +613,6 @@ function ReviewSidebar({ open, onClose }) {
               ))}
             </div>
           </div>
-
-          {/* 保存按钮 */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full py-3 rounded-xl text-white text-[0.875rem] font-semibold transition-all"
-            style={{ backgroundColor: ACCENT, opacity: saving ? 0.7 : 1 }}
-            onMouseEnter={e => !saving && (e.currentTarget.style.backgroundColor = ACCENT_LIGHT)}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = ACCENT}>
-            {saving ? '保存中...' : '💾 保存复盘'}
-          </button>
 
           {/* 分析卡片 */}
           {analysis && (

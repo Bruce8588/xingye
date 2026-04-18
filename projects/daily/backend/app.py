@@ -396,7 +396,7 @@ def get_review(review_date):
     return jsonify(result)
 
 
-@app.route('/api/reviews/<review_date>', methods=['POST'])
+@app.route('/api/reviews/<review_date>', methods=['POST', 'PUT'])
 def save_review(review_date):
     """保存指定日期的复盘"""
     session = get_session()

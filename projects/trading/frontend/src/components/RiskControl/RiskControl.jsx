@@ -80,6 +80,23 @@ export default function RiskControl() {
     setLoading(false)
   }
 
+  // 不触发 loading 的轻量刷新，仅更新 decisions
+  const refreshDecisions = async () => {
+    try {
+      const [decRes, statsRes] = await Promise.all([
+        fetch(`${API}/decisions`),
+        fetch(`${API}/decisions/stats`),
+      ])
+      setDecisions(await decRes.json())
+      const statsData = await statsRes.json()
+      setStats(statsData)
+      setTotalCapital(statsData.total_capital || 100000)
+      setCapitalInput(String(statsData.total_capital || 100000))
+    } catch (err) {
+      console.error('Failed to refresh:', err)
+    }
+  }
+
   const activeDecisions = decisions.filter(d => d.status === 'active')
   const completedDecisions = decisions.filter(d => d.status === 'completed')
 
@@ -249,9 +266,9 @@ export default function RiskControl() {
             {modalEditing ? (
               <textarea
                 value={modalDraft}
-                onChange={async e => {
+                onChange={e => {
                   setModalDraft(e.target.value)
-                  // 自动保存（防抖）
+                  // 自动保存（防抖 2s），静默更新不闪屏
                   clearTimeout(window._modalSaveTimer)
                   window._modalSaveTimer = setTimeout(async () => {
                     try {
@@ -260,11 +277,11 @@ export default function RiskControl() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ [logicModal.field]: e.target.value }),
                       })
-                      fetchAll()
+                      refreshDecisions()
                     } catch (err) {
                       console.error('Failed to save:', err)
                     }
-                  }, 800)
+                  }, 2000)
                 }}
                 rows={6}
                 className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
