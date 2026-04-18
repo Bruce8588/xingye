@@ -125,11 +125,9 @@ class Decision(Base):
     __tablename__ = 'decisions'
     id = Column(Integer, primary_key=True)
     stock_name = Column(String(100), nullable=False)
-    decision = Column(Text, nullable=False)
     max_risk = Column(Float, default=0)
     buy_price = Column(Float, default=0)
     stop_loss = Column(Float, default=0)
-    position_period = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
     # Existing columns from DB (may not be in model yet)
     buy_amount = Column(Float, default=0)
@@ -142,6 +140,7 @@ class Decision(Base):
     entry_type = Column(String(20))              # high_entry / low_entry
     entry_logic = Column(Text)                   # 买入逻辑
     expectation = Column(Text)                   # 预期
+    current_trend = Column(Text)                 # 当前走势
     status = Column(String(20), default='active') # active / completed
     # Auto-calculated fields (stored for convenience)
     risk_amount = Column(Float, default=0)       # 单笔风险金额
@@ -196,6 +195,38 @@ if 'sort_order' not in columns:
             conn.execute(text("UPDATE logic_groups SET sort_order = :so WHERE id = :id"),
                          [{'so': idx, 'id': row.id}])
         print(f"Migration: initialized sort_order for {len(results)} logic groups")
+
+# Migration: add current_trend column to decisions if not exists
+columns = [c['name'] for c in inspector.get_columns('decisions')]
+if 'current_trend' not in columns:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE decisions ADD COLUMN current_trend TEXT"))
+        print("Migration: added current_trend column to decisions")
+
+# Migration: remove obsolete decision column (was NOT NULL constraint causing inserts to fail)
+# Only run if decision column still exists (migration is idempotent - checks before running)
+try:
+    with engine.begin() as conn:
+        col_info = conn.execute(text("PRAGMA table_info(decisions)")).fetchall()
+        existing_cols = [row[1] for row in col_info]
+        
+        if 'decision' not in existing_cols and 'position_period' not in existing_cols:
+            print("Migration: decision/position_period already removed, skipping")
+        else:
+            print(f"Migration: rebuilding decisions table, columns: {existing_cols}")
+            new_cols = [c for c in existing_cols if c not in ('decision', 'position_period')]
+            conn.execute(text(f"CREATE TABLE decisions_new ({', '.join([c+' TEXT' for c in new_cols])})"))
+            select_cols = ', '.join(new_cols)
+            results = conn.execute(text(f"SELECT {select_cols} FROM decisions")).fetchall()
+            if results:
+                placeholders = ', '.join(['?' for _ in new_cols])
+                conn.execute(text(f"INSERT INTO decisions_new VALUES ({placeholders})"), results)
+            conn.execute(text("DROP TABLE decisions"))
+            conn.execute(text("ALTER TABLE decisions_new RENAME TO decisions"))
+            conn.execute(text("CREATE UNIQUE INDEX ix_decisions_id ON decisions (id)"))
+            print("Migration: rebuilt decisions table (dropped decision/position_period)")
+except Exception as e:
+    print(f"Migration: could not rebuild table: {e}")
 
 # ============== API Routes ==============
 
@@ -919,10 +950,10 @@ def delete_trading_review(id):
 # --- Decisions ---
 def _calc_decision_fields(d, total_capital):
     """计算自动字段"""
-    buy_price = d.buy_price or 0
-    quantity = d.quantity or 0
-    stop_loss = d.stop_loss or 0
-    sell_price = d.sell_price or 0
+    buy_price = float(d.buy_price) if d.buy_price else 0
+    quantity = float(d.quantity) if d.quantity else 0
+    stop_loss = float(d.stop_loss) if d.stop_loss else 0
+    sell_price = float(d.sell_price) if d.sell_price else 0
 
     buy_amount = buy_price * quantity
     risk_amount = max(0, (buy_price - stop_loss) * quantity)
@@ -945,33 +976,38 @@ def _calc_decision_fields(d, total_capital):
         'final_pnl_percent': final_pnl_percent,
     }
 
+def _to_float(v, default=0):
+    try:
+        return float(v) if v is not None else default
+    except (ValueError, TypeError):
+        return default
+
 def _decision_to_dict(d, total_capital=100000):
     calced = _calc_decision_fields(d, total_capital)
     return {
         'id': d.id,
         'stock_name': d.stock_name,
-        'decision': d.decision,
-        'max_risk': d.max_risk,
-        'buy_price': d.buy_price,
-        'stop_loss': d.stop_loss,
-        'position_period': d.position_period,
+        'max_risk': _to_float(d.max_risk),
+        'buy_price': _to_float(d.buy_price),
+        'stop_loss': _to_float(d.stop_loss),
         'created_at': d.created_at.isoformat() if d.created_at else None,
         'updated_at': d.updated_at.isoformat() if d.updated_at else None,
-        'buy_amount': d.buy_amount or calced['buy_amount'],
-        'buy_shares': d.buy_shares or d.quantity,
-        'quantity': d.quantity,
-        'sell_price': d.sell_price,
+        'buy_amount': _to_float(d.buy_amount) or calced['buy_amount'],
+        'buy_shares': _to_float(d.buy_shares) or _to_float(d.quantity),
+        'quantity': _to_float(d.quantity),
+        'sell_price': _to_float(d.sell_price),
         'market_type': d.market_type or '',
         'trade_model': d.trade_model or '',
         'entry_type': d.entry_type or '',
         'entry_logic': d.entry_logic or '',
         'expectation': d.expectation or '',
+        'current_trend': d.current_trend or '',
         'status': d.status or 'active',
-        'risk_amount': d.risk_amount or calced['risk_amount'],
-        'risk_percent': d.risk_percent or calced['risk_percent'],
-        'capital_percent': d.capital_percent or calced['capital_percent'],
-        'final_pnl_percent': d.final_pnl_percent if d.final_pnl_percent != 0 else calced['final_pnl_percent'],
-        'final_pnl': d.final_pnl or calced['final_pnl'],
+        'risk_amount': _to_float(d.risk_amount) or calced['risk_amount'],
+        'risk_percent': _to_float(d.risk_percent) or calced['risk_percent'],
+        'capital_percent': _to_float(d.capital_percent) or calced['capital_percent'],
+        'final_pnl_percent': _to_float(d.final_pnl_percent) if d.final_pnl_percent != 0 else calced['final_pnl_percent'],
+        'final_pnl': _to_float(d.final_pnl) or calced['final_pnl'],
     }
 
 @app.route('/api/decisions', methods=['GET'])
@@ -996,11 +1032,9 @@ def create_decision():
 
     decision = Decision(
         stock_name=data['stock_name'],
-        decision=data['decision'],
         max_risk=data.get('max_risk', 0),
         buy_price=data.get('buy_price', 0),
         stop_loss=data.get('stop_loss', 0),
-        position_period=data.get('position_period', ''),
         quantity=data.get('quantity', 0),
         sell_price=data.get('sell_price', 0),
         market_type=data.get('market_type', ''),
@@ -1008,6 +1042,7 @@ def create_decision():
         entry_type=data.get('entry_type', ''),
         entry_logic=data.get('entry_logic', ''),
         expectation=data.get('expectation', ''),
+        current_trend=data.get('current_trend', ''),
         status=data.get('status', 'active'),
     )
     session.add(decision)
@@ -1033,9 +1068,9 @@ def update_decision(id):
             total_capital = r.value
 
     # Update fields
-    for field in ['stock_name', 'decision', 'max_risk', 'buy_price', 'stop_loss',
-                  'position_period', 'quantity', 'sell_price', 'market_type',
-                  'trade_model', 'entry_type', 'entry_logic', 'expectation', 'status']:
+    for field in ['stock_name', 'max_risk', 'buy_price', 'stop_loss',
+                  'quantity', 'sell_price', 'market_type',
+                  'trade_model', 'entry_type', 'entry_logic', 'expectation', 'current_trend', 'status']:
         if field in data:
             setattr(decision, field, data[field])
 
@@ -1063,27 +1098,24 @@ def get_decision_stats():
     decisions = session.query(Decision).all()
 
     # Get total capital
-    total_capital = 100000
     rules = session.query(RiskRule).all()
-    for r in rules:
-        if r.name == 'total_capital':
-            total_capital = r.value
+    total_capital = _to_float(next((r.value for r in rules if r.name == 'total_capital'), None)) or 100000
 
     active = [d for d in decisions if d.status == 'active']
     completed = [d for d in decisions if d.status == 'completed']
 
     # Calculate active positions
-    active_capital = sum((d.buy_price or 0) * (d.quantity or 0) for d in active)
-    active_risk = sum(max(0, ((d.buy_price or 0) - (d.stop_loss or 0)) * (d.quantity or 0)) for d in active)
+    active_capital = sum(_to_float(d.buy_price) * _to_float(d.quantity) for d in active)
+    active_risk = sum(max(0, (_to_float(d.buy_price) - _to_float(d.stop_loss)) * _to_float(d.quantity)) for d in active)
 
     # Win rate
-    win_count = sum(1 for d in completed if (d.final_pnl or (d.sell_price or 0) - (d.buy_price or 0) * (d.quantity or 0)) > 0)
+    win_count = sum(1 for d in completed if _to_float(d.final_pnl) > 0)
     total_completed = len(completed)
     win_rate = round(win_count / total_completed * 100, 1) if total_completed > 0 else 0
 
     # Total P&L
-    total_pnl = sum(d.final_pnl or 0 for d in completed)
-    total_invested = sum((d.buy_price or 0) * (d.quantity or 0) for d in completed)
+    total_pnl = sum(_to_float(d.final_pnl) for d in completed)
+    total_invested = sum(_to_float(d.buy_price) * _to_float(d.quantity) for d in completed)
     total_return = round(total_pnl / total_invested * 100, 2) if total_invested > 0 else 0
 
     session.close()

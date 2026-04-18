@@ -31,8 +31,9 @@ const EMPTY_FORM = {
   market_type: '',
   trade_model: '',
   entry_type: '',
-  entry_logic: '',
-  expectation: '',
+  entry_logic: '突破关键阻力位，量能放大，站上均线系统',
+  expectation: '目标涨幅 X%，止损下方 X%',
+  current_trend: '当前处于 [上涨/震荡/下跌] 阶段，[描述走势]',
   sell_price: '',
   status: 'active',
 }
@@ -49,7 +50,9 @@ export default function RiskControl() {
   const [totalCapital, setTotalCapital] = useState(100000)
   const [editingCapital, setEditingCapital] = useState(false)
   const [capitalInput, setCapitalInput] = useState('')
-  const [logicModal, setLogicModal] = useState({ open: false, title: '', content: '' })
+  const [logicModal, setLogicModal] = useState({ open: false, title: '', content: '', decisionId: null, field: '' })
+  const [modalEditing, setModalEditing] = useState(false)
+  const [modalDraft, setModalDraft] = useState('')
   const [hasUnsavedCapital, setHasUnsavedCapital] = useState(false)
 
   useEffect(() => {
@@ -130,6 +133,7 @@ export default function RiskControl() {
         entry_type: form.entry_type,
         entry_logic: form.entry_logic,
         expectation: form.expectation,
+        current_trend: form.current_trend,
         status: form.status,
       }
       if (editingId) {
@@ -185,6 +189,7 @@ export default function RiskControl() {
       entry_type: decision.entry_type || '',
       entry_logic: decision.entry_logic || '',
       expectation: decision.expectation || '',
+      current_trend: decision.current_trend || '',
       sell_price: decision.sell_price || '',
       status: decision.status,
     })
@@ -233,15 +238,46 @@ export default function RiskControl() {
     <div className="max-w-5xl mx-auto">
       {/* 逻辑/预期弹窗 */}
       {logicModal.open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setLogicModal({ open: false, title: '', content: '' })}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setLogicModal({ open: false, title: '', content: '', decisionId: null, field: '' }); setModalEditing(false); setModalDraft('') }}>
           <div className="bg-slate-800 rounded-xl border border-slate-600 p-6 max-w-lg w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-white">{logicModal.title}</h3>
-              <button onClick={() => setLogicModal({ open: false, title: '', content: '' })} className="text-slate-400 hover:text-white">
+              <button onClick={() => { setLogicModal({ open: false, title: '', content: '', decisionId: null, field: '' }); setModalEditing(false); setModalDraft('') }} className="text-slate-400 hover:text-white">
                 <XCircle size={20} />
               </button>
             </div>
-            <p className="text-slate-300 whitespace-pre-wrap text-sm leading-relaxed">{logicModal.content || '暂无内容'}</p>
+            {modalEditing ? (
+              <textarea
+                value={modalDraft}
+                onChange={async e => {
+                  setModalDraft(e.target.value)
+                  // 自动保存（防抖）
+                  clearTimeout(window._modalSaveTimer)
+                  window._modalSaveTimer = setTimeout(async () => {
+                    try {
+                      await fetch(`${API}/decisions/${logicModal.decisionId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ [logicModal.field]: e.target.value }),
+                      })
+                      fetchAll()
+                    } catch (err) {
+                      console.error('Failed to save:', err)
+                    }
+                  }, 800)
+                }}
+                rows={6}
+                className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoFocus
+              />
+            ) : (
+              <div
+                onClick={() => { setModalDraft(logicModal.content); setModalEditing(true) }}
+                className="cursor-pointer hover:bg-slate-700/50 rounded p-2 -m-2 transition-colors"
+              >
+                <p className="text-slate-300 whitespace-pre-wrap text-sm leading-relaxed">{logicModal.content || '暂无内容，点击添加'}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -500,6 +536,18 @@ export default function RiskControl() {
               />
             </div>
 
+            {/* 当前走势 */}
+            <div>
+              <label className="block text-slate-400 text-sm mb-1">当前走势</label>
+              <textarea
+                value={form.current_trend}
+                onChange={(e) => setForm({ ...form, current_trend: e.target.value })}
+                placeholder="当前走势描述..."
+                rows={2}
+                className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
             {/* 卖出价格（编辑时） */}
             {editingId && (
               <div>
@@ -561,7 +609,7 @@ export default function RiskControl() {
             onDelete={() => handleDelete(d.id)}
             pnlColor={pnlColor}
             formatDate={formatDate}
-            onShowLogic={(title, content) => setLogicModal({ open: true, title, content })}
+            onShowLogic={(title, content, field) => setLogicModal({ open: true, title, content, decisionId: d.id, field })}
           />
         ))}
       </div>
@@ -592,7 +640,7 @@ export default function RiskControl() {
                   onDelete={() => handleDelete(d.id)}
                   pnlColor={pnlColor}
                   formatDate={formatDate}
-                  onShowLogic={(title, content) => setLogicModal({ open: true, title, content })}
+                  onShowLogic={(title, content, field) => setLogicModal({ open: true, title, content, decisionId: d.id, field })}
                   isCompleted
                 />
               ))}
@@ -702,29 +750,33 @@ function TradeCard({ decision: d, totalCapital, expanded, onToggle, onComplete, 
           </div>
         )}
 
-        {/* 买入逻辑 & 预期按钮（始终显示） */}
-        {(d.entry_logic || d.expectation) && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {d.entry_logic && (
-              <button
-                onClick={() => onShowLogic('买入逻辑', d.entry_logic)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
-              >
-                <FileText size={13} />
-                买入逻辑
-              </button>
-            )}
-            {d.expectation && (
-              <button
-                onClick={() => onShowLogic('交易预期', d.expectation)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
-              >
-                <Lightbulb size={13} />
-                交易预期
-              </button>
-            )}
-          </div>
-        )}
+        {/* 买入逻辑 & 预期 & 当前走势按钮（始终显示） */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            onClick={() => onShowLogic('买入逻辑', d.entry_logic, 'entry_logic')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+          >
+            <FileText size={13} />
+            买入逻辑
+            {!d.entry_logic && <span className="text-slate-600 ml-1">未填写</span>}
+          </button>
+          <button
+            onClick={() => onShowLogic('交易预期', d.expectation, 'expectation')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+          >
+            <Lightbulb size={13} />
+            交易预期
+            {!d.expectation && <span className="text-slate-600 ml-1">未填写</span>}
+          </button>
+          <button
+            onClick={() => onShowLogic('当前走势', d.current_trend, 'current_trend')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+          >
+            <TrendingUp size={13} />
+            当前走势
+            {!d.current_trend && <span className="text-slate-600 ml-1">未填写</span>}
+          </button>
+        </div>
 
         {/* 展开详情 */}
         {expanded && (

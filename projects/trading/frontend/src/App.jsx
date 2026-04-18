@@ -36,20 +36,20 @@ const DEFAULT_PAGE_ORDER = [
   { id: 'records',     label: '行情记录',   iconName: 'Table' },
 ]
 
-// 从 localStorage 恢复页面顺序（iconName → 组件）
+// 从 localStorage 恢复页面顺序（id 匹配即可，iconName/label 自动补全）
 const restorePageOrder = () => {
   try {
     const saved = localStorage.getItem(PAGE_ORDER_KEY)
     if (!saved) return DEFAULT_PAGE_ORDER
     const parsed = JSON.parse(saved)
+    if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_PAGE_ORDER
     return parsed.map(item => {
-      // 恢复 iconName → 组件引用
-      if (item.iconName && ICON_REGISTRY[item.iconName]) {
-        return item
-      }
-      // iconName 不合法，用默认值兜底
+      // id 存在于默认列表就保留，自动补全 iconName 和 label
       const defaultItem = DEFAULT_PAGE_ORDER.find(d => d.id === item.id)
-      return defaultItem || null
+      if (defaultItem) {
+        return { ...defaultItem }
+      }
+      return null
     }).filter(Boolean)
   } catch {
     return DEFAULT_PAGE_ORDER
@@ -164,7 +164,7 @@ function App() {
         w-64 ${sidebarOpen ? 'md:w-64' : 'md:w-0 md:border-0'}
         ${sidebarOpen ? 'w-64' : 'w-0 border-0'}
       `}>
-        <div className={`p-6 w-64 ${!sidebarOpen ? 'md:hidden' : ''}`}>
+        <div className={`pt-16 p-6 w-64 ${!sidebarOpen ? 'md:hidden' : ''}`}>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-xl font-bold text-indigo-400 truncate pr-2">交易系统</h1>
             <button
