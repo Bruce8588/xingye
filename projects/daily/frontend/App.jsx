@@ -66,6 +66,17 @@ function ProjectCard({ project, onUpdate, onDelete, onDragStart, onDragOver, onD
     el.style.height = el.scrollHeight + 'px'
   }
 
+  // 打开编辑时，自适应已有内容的高度
+  useEffect(() => {
+    if (editing) {
+      setTimeout(() => {
+        autoResize(problemRef.current)
+        autoResize(planRef.current)
+        autoResize(targetRef.current)
+      }, 0)
+    }
+  }, [editing])
+
   function handleSave() {
     onUpdate(project.id, form)
     setEditing(false)
