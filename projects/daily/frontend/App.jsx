@@ -11,6 +11,14 @@ const ACCENT_LIGHT = '#818cf8'
 
 const API_BASE = '/daily/api'
 
+// ─── 日期工具（使用本地时间，避免 UTC 时区问题）───
+function toLocalDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // ─── API 工具 ───
 async function apiGet(path) {
   const res = await fetch(API_BASE + path)
@@ -309,7 +317,7 @@ function InboxSidebar({ open, onClose, todos, onAdd, onToggle, onMoveToday, onDe
 
 // ─── 复盘侧边栏 ───
 function ReviewSidebar({ open, onClose }) {
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = toLocalDateStr(new Date())
   const [reviewDate, setReviewDate] = useState(todayStr)
   const [content, setContent] = useState('')
   const [tomorrowPlan, setTomorrowPlan] = useState('')
@@ -379,6 +387,10 @@ function ReviewSidebar({ open, onClose }) {
     } catch (e) { console.error(e) }
   }
 
+  // 用 ref 保存最新 reviewDate，避免闭包捕获旧值导致数据写入错误日期
+  const reviewDateRef = useRef(reviewDate)
+  useEffect(() => { reviewDateRef.current = reviewDate }, [reviewDate])
+
   useEffect(() => {
     if (open) loadData(reviewDate)
   }, [open, reviewDate])
@@ -386,8 +398,9 @@ function ReviewSidebar({ open, onClose }) {
   async function handleSave(silent = false) {
     if (!silent) setSaving(true)
     try {
-      await apiPut(`/reviews/${reviewDate}`, { content, tomorrow_plan: tomorrowPlan, mood, energy, tags })
-      await loadData(reviewDate)
+      // 使用 ref 获取最新的 reviewDate，避免闭包问题
+      await apiPut(`/reviews/${reviewDateRef.current}`, { content, tomorrow_plan: tomorrowPlan, mood, energy, tags })
+      await loadData(reviewDateRef.current)
       if (!silent) alert('复盘已保存 ✓')
       setLastSaved(new Date())
     } catch (e) { console.error(e) } finally { if (!silent) setSaving(false) }
@@ -400,7 +413,7 @@ function ReviewSidebar({ open, onClose }) {
       handleSave(true)
     }, 1500)
     return () => clearTimeout(timer)
-  }, [content, tomorrowPlan, mood, energy, tags])
+  }, [content, tomorrowPlan, mood, energy, tags, reviewDate])
 
   function addTag(t) {
     if (t && !tags.includes(t)) setTags([...tags, t])
@@ -409,7 +422,7 @@ function ReviewSidebar({ open, onClose }) {
   function shiftDate(ds, delta) {
     const d = new Date(ds)
     d.setDate(d.getDate() + delta)
-    return d.toISOString().split('T')[0]
+    return toLocalDateStr(d)
   }
 
   function getCalendarDays(ds) {
@@ -420,10 +433,10 @@ function ReviewSidebar({ open, onClose }) {
     for (let i = 0; i < startDow; i++) days.push({ day: '', date: '', isFuture: false })
     const y = d.getFullYear(), m = d.getMonth()
     const today = new Date()
-    const todayStr2 = today.toISOString().split('T')[0]
+    const todayStr2 = toLocalDateStr(today)
     let cur = new Date(d)
     while (cur.getMonth() === m) {
-      const ds2 = cur.toISOString().split('T')[0]
+      const ds2 = toLocalDateStr(cur)
       days.push({ day: cur.getDate(), date: ds2, isFuture: ds2 > todayStr2 })
       cur.setDate(cur.getDate() + 1)
     }
