@@ -53,6 +53,7 @@ class Todo(Base):
     priority = Column(String(10), default='medium')
     done = Column(Boolean, default=False)
     sort_order = Column(Integer, default=0)
+    today_badge = Column(Boolean, default=False)  # 在收集箱内显示"今天"橙色徽章
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -240,6 +241,7 @@ def create_todo():
         priority=data.get('priority', 'medium'),
         done=data.get('done', False),
         sort_order=next_order,
+        today_badge=data.get('today_badge', False),
     )
     session.add(todo)
     session.commit()
@@ -257,7 +259,7 @@ def update_todo(todo_id):
         session.close()
         return jsonify({'error': 'Todo not found'}), 404
     data = request.get_json()
-    for key in ['text', 'deadline', 'priority', 'done', 'sort_order']:
+    for key in ['text', 'deadline', 'priority', 'done', 'sort_order', 'today_badge']:
         if key in data:
             setattr(todo, key, data[key])
     todo.updated_at = datetime.utcnow()

@@ -56,6 +56,15 @@ async function apiDelete(path) {
 function ProjectCard({ project, onUpdate, onDelete, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, isDragging, isOver }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ problem: project.problem, plan: project.plan, target: project.target })
+  const problemRef = useRef(null)
+  const planRef = useRef(null)
+  const targetRef = useRef(null)
+
+  function autoResize(el) {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
 
   function handleSave() {
     onUpdate(project.id, form)
@@ -111,25 +120,29 @@ function ProjectCard({ project, onUpdate, onDelete, onDragStart, onDragOver, onD
       {editing ? (
         <div className="space-y-2.5 mt-2">
           {[
-            { key: 'problem', label: '核心问题', placeholder: '当前最核心的问题是什么？' },
-            { key: 'plan', label: '行动计划', placeholder: '具体要做什么？' },
-            { key: 'target', label: '目标', placeholder: '想要达成的结果？' },
+            { key: 'problem', label: '核心问题', placeholder: '当前最核心的问题是什么？', ref: problemRef },
+            { key: 'plan', label: '行动计划', placeholder: '具体要做什么？', ref: planRef },
+            { key: 'target', label: '目标', placeholder: '想要达成的结果？', ref: targetRef },
           ].map(field => (
             <div key={field.key}>
               <label className="text-[0.7rem] mb-1 block" style={{ color: '#7A5030' }}>{field.label}</label>
-              <input
+              <textarea
+                ref={field.ref}
                 value={form[field.key]}
-                onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                onChange={e => { setForm({ ...form, [field.key]: e.target.value }); autoResize(e.target) }}
+                onInput={e => autoResize(e.target)}
                 placeholder={field.placeholder}
-                className="w-full px-3 py-2 rounded-lg text-[0.8125rem] placeholder:text-[#BB8866] transition-colors focus:outline-none"
-                style={{ backgroundColor: '#FFF9F4', border: '1px solid rgba(180,120,80,0.2)', color:'#3D2517' }}
+                rows={1}
+                className="w-full px-3 py-2 rounded-lg text-[0.8125rem] placeholder:text-[#BB8866] transition-colors focus:outline-none resize-none overflow-hidden"
+                style={{ backgroundColor: '#FFF9F4', border: '1px solid rgba(180,120,80,0.2)', color:'#3D2517', minHeight: '38px', lineHeight: '1.5' }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#C8742A'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(180,120,80,0.2)'}
               />
             </div>
           ))}
           <div className="flex gap-2 pt-1">
-            <button onClick={handleSave} className="flex-1 py-1.5 rounded-lg text-white text-[0.8125rem] font-medium transition-all" style={{ backgroundColor: ACCENT }}
+            <button onClick={() => { handleSave(); autoResize(problemRef.current); autoResize(planRef.current); autoResize(targetRef.current) }}
+              className="flex-1 py-1.5 rounded-lg text-white text-[0.8125rem] font-medium transition-all" style={{ backgroundColor: ACCENT }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = ACCENT_LIGHT}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = ACCENT}>
               保存
@@ -203,27 +216,148 @@ function TodoItem({ todo, onToggle, onDelete, onMoveToday }) {
 }
 
 // ─── 收集箱侧边栏 ───
-function InboxSidebar({ open, onClose, todos, onAdd, onToggle, onMoveToday, onDelete }) {
+function InboxSidebar({ open, onClose, todos, onAdd, onToggle, onMoveToday, onDelete, onOpenMatrix }) {
   const [newText, setNewText] = useState('')
-  const [newDeadline, setNewDeadline] = useState('')
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
-  const inboxTodos = todos.filter(t => t.deadline === 'inbox')
+  const today = new Date()
+  const todayStr = toLocalDateStr(today)
 
-  function handleAdd() {
+  // 未来7天快捷按钮数据
+  const quickDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    const dayNames = ['今天', '明天', '后天']
+    const dow = d.getDay() // 0=Sun
+    const label = i < 3 ? dayNames[i] : ['周日','周一','周二','周三','周四','周五','周六'][dow]
+    return { label, date: toLocalDateStr(d), isToday: i === 0 }
+  })
+
+  // 今日待办：deadline = todayStr 或 'today'
+  const todayItems = todos.filter(t => t.deadline === todayStr || t.deadline === 'today')
+  // 收集箱：deadline = inbox（且无 today_badge）
+  const inboxItems = todos.filter(t => t.deadline === 'inbox' && !t.today_badge)
+  // 已排期（未来7天，非today）
+  const scheduledItems = todos.filter(t => {
+    if (t.deadline === todayStr || t.deadline === 'today' || t.deadline === 'inbox') return false
+    return quickDays.some(d => d.date === t.deadline)
+  })
+  // 收集箱里带 today_badge 的项（显示在收集箱但带今天徽章）
+  const inboxTodayItems = todos.filter(t => t.today_badge)
+
+  function handleAdd(deadline) {
     if (!newText.trim()) return
-    onAdd({ text: newText.trim(), deadline: newDeadline || 'inbox', priority: 'medium', done: false })
+    onAdd({ text: newText.trim(), deadline: deadline, priority: 'medium', done: false })
     setNewText('')
-    setNewDeadline('')
+    setShowDatePicker(false)
   }
+
+  function handleMoveToday(todo) {
+    // 移到今天：更新现有任务 + 标记 today_badge（收集箱内显示今天徽章）
+    onMoveToday(todo.id, { today_badge: true })
+  }
+
+  function ItemCard({ t, showDate, isInboxToday }) {
+    const dateLabel = showDate && t.deadline !== todayStr
+      ? quickDays.find(d => d.date === t.deadline)?.label || new Date(t.deadline).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+      : null
+
+    return (
+      <div className="flex items-start gap-2 p-2.5 rounded-xl"
+        style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.12)' }}>
+        <button
+          onClick={() => onToggle(t.id)}
+          className="flex-shrink-0 w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center transition-all"
+          style={{ borderColor: t.done ? ACCENT : '#C8742A', backgroundColor: t.done ? ACCENT : 'transparent' }}
+        >
+          {t.done && <Check size={10} className="text-white" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-[0.8125rem] leading-snug" style={{ color: t.done ? '#B0A090' : '#3D2517', textDecoration: t.done ? 'line-through' : 'none' }}>
+              {t.text}
+            </p>
+            {dateLabel && (
+              <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ backgroundColor: 'rgba(200,116,42,0.12)', color: '#C8742A' }}>
+                {dateLabel}
+              </span>
+            )}
+            {isInboxToday && (
+              <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-bold"
+                style={{ backgroundColor: '#C8742A', color: '#fff' }}>
+                今天
+              </span>
+            )}
+          </div>
+          {t.project && (
+            <span className="inline-block mt-1 text-[0.65rem] px-2 py-0.5 rounded-full font-medium"
+              style={{ backgroundColor: t.projectColor ? t.projectColor + '22' : 'rgba(99,102,241,0.1)', color: t.projectColor || ACCENT }}>
+              {t.project}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col gap-0.5 flex-shrink-0">
+          <button
+            onClick={() => handleMoveToday(t)}
+            className="px-2 py-0.5 rounded text-[0.65rem] font-medium transition-all"
+            style={{ color: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#6366f1'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.08)'; e.currentTarget.style.color = '#6366f1' }}>
+            → 今
+          </button>
+          <button
+            onClick={() => onDelete(t.id)}
+            className="px-2 py-0.5 rounded text-[0.65rem] font-medium transition-all"
+            style={{ color: '#DC2626', backgroundColor: 'rgba(220,38,38,0.06)' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#DC2626'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(220,38,38,0.06)'; e.currentTarget.style.color = '#DC2626' }}>
+            ×
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // 今日待办紧凑行（金色主题，置顶用）
+  function CompactItem({ t, onToggle, gold }) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl" style={{ backgroundColor: gold ? 'rgba(200,116,42,0.08)' : 'rgba(200,116,42,0.04)' }}>
+        <button
+          onClick={() => onToggle(t.id)}
+          className="flex-shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all"
+          style={{ borderColor: t.done ? ACCENT : '#C8742A', backgroundColor: t.done ? ACCENT : 'transparent' }}
+        >
+          {t.done && <Check size={8} className="text-white" />}
+        </button>
+        <p className="flex-1 text-[0.75rem] leading-snug truncate" style={{ color: t.done ? '#B0A090' : '#C8742A', textDecoration: t.done ? 'line-through' : 'none', fontWeight: gold ? 500 : 400 }}>
+          {t.text}
+        </p>
+      </div>
+    )
+  }
+
+  function SectionLabel({ emoji, label, count, orange }) {
+    return (
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[0.75rem]">{emoji}</span>
+        <span className="text-[0.75rem] font-semibold" style={{ color: orange ? '#C8742A' : '#7A5030' }}>{label}</span>
+        {count > 0 && (
+          <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-bold"
+            style={{ backgroundColor: orange ? 'rgba(200,116,42,0.18)' : 'rgba(180,120,80,0.15)', color: orange ? '#C8742A' : '#7A5030' }}>
+            {count}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  const allCount = todayItems.length + inboxItems.length + scheduledItems.length + inboxTodayItems.length
 
   return (
     <>
       {open && (
-        <div
-          className="fixed inset-0 z-40"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-40" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose} />
       )}
       <div
         className="fixed top-0 right-0 h-full w-80 z-50 flex flex-col transition-transform duration-300"
@@ -233,85 +367,315 @@ function InboxSidebar({ open, onClose, todos, onAdd, onToggle, onMoveToday, onDe
           transform: open ? 'translateX(0)' : 'translateX(100%)',
         }}
       >
-        {/* 标题 */}
-        <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid rgba(180,120,80,0.2)' }}>
-          <div className="flex items-center gap-2.5">
+        {/* 标题栏 */}
+        <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(180,120,80,0.2)' }}>
+          <div className="flex items-center gap-2">
             <Inbox size={18} style={{ color: '#C8742A' }} />
-            <span className="font-semibold text-[0.9375rem]" style={{color:'#3D2517'}}>收集箱</span>
-            <span className="text-[0.75rem]" style={{color:'#7A5030'}}>({inboxTodos.length})</span>
+            <span className="font-semibold text-[0.9375rem]" style={{ color: '#3D2517' }}>收集箱</span>
+            {allCount > 0 && (
+              <span className="text-[0.7rem] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(200,116,42,0.1)', color: '#C8742A' }}>
+                {allCount}
+              </span>
+            )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: '#7A5030', backgroundColor: 'rgba(200,116,42,0.08)' }}
-            onMouseEnter={e=>e.currentTarget.style.color='#3D2517'}
-            onMouseLeave={e=>e.currentTarget.style.color='#7A5030'}>
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* 添加区 */}
-        <div className="p-4 space-y-2.5" style={{ borderBottom: '1px solid rgba(180,120,80,0.2)' }}>
-          <textarea
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }}
-            placeholder="记录想法... (Enter 提交)"
-            rows={2}
-            className="w-full px-3 py-2 rounded-xl text-[0.8125rem] resize-none focus:outline-none transition-colors"
-            style={{ backgroundColor: '#FFF9F4', border: '1px solid rgba(180,120,80,0.2)', color:'#3D2517' }}
-          />
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={newDeadline}
-              onChange={e => setNewDeadline(e.target.value)}
-              className="flex-1 px-2.5 py-1.5 rounded-lg text-[0.75rem] focus:outline-none"
-              style={{ backgroundColor: '#FFF9F4', border: '1px solid rgba(180,120,80,0.2)', color:'#3D2517' }}
-            />
-            <button onClick={handleAdd}
-              className="px-4 py-1.5 rounded-lg text-white text-[0.8125rem] font-medium transition-all"
-              style={{ backgroundColor: ACCENT }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = ACCENT_LIGHT}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = ACCENT}>
-              添加
+          <div className="flex items-center gap-1.5">
+            <button onClick={onOpenMatrix}
+              className="px-2.5 py-1.5 rounded-lg text-[0.7rem] font-medium transition-all"
+              style={{ backgroundColor: '#7C3AED', color: '#fff' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#6D28D9'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#7C3AED'}>
+              四象限
+            </button>
+            <button onClick={onClose}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: '#7A5030', backgroundColor: 'rgba(200,116,42,0.08)' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#3D2517'}
+              onMouseLeave={e => e.currentTarget.style.color = '#7A5030'}>
+              <X size={16} />
             </button>
           </div>
         </div>
 
-        {/* 列表 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {inboxTodos.length === 0 && (
-            <div className="text-center text-[0.875rem] py-12" style={{color:'#7A5030'}}>
-              <Inbox size={32} className="mx-auto mb-3 opacity-30" />
-              收集箱是空的
+        {/* 快速添加区 */}
+        <div className="p-3 space-y-2" style={{ borderBottom: '1px solid rgba(180,120,80,0.2)' }}>
+          <textarea
+            value={newText}
+            onChange={e => setNewText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (newText.trim()) handleAdd('inbox')
+              }
+            }}
+            placeholder="记下来... Enter 发到收集箱"
+            rows={2}
+            className="w-full px-3 py-2 rounded-xl text-[0.8125rem] resize-none focus:outline-none"
+            style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)', color: '#3D2517' }}
+          />
+
+          {/* 7天快捷按钮 + 日期选择器 */}
+          <div className="flex gap-1 items-center">
+            {quickDays.map(({ label, date, isToday }) => (
+              <button
+                key={date}
+                onClick={() => newText.trim() && handleAdd(date)}
+                disabled={!newText.trim()}
+                className="flex-1 py-1.5 rounded-lg text-[0.65rem] font-medium transition-all"
+                style={{
+                  backgroundColor: isToday ? 'rgba(200,116,42,0.14)' : 'rgba(180,120,80,0.06)',
+                  border: isToday ? '1.5px solid #C8742A' : '1.5px solid transparent',
+                  color: isToday ? '#C8742A' : '#7A5030',
+                  fontWeight: isToday ? 600 : 400,
+                  opacity: newText.trim() ? 1 : 0.4,
+                  cursor: newText.trim() ? 'pointer' : 'not-allowed',
+                }}>
+                {label}
+              </button>
+            ))}
+            {/* 自由日期选择按钮 */}
+            <button
+              onClick={() => setShowDatePicker(v => !v)}
+              className="flex-shrink-0 px-2 py-1.5 rounded-lg text-[0.65rem] font-medium transition-all"
+              style={{
+                backgroundColor: showDatePicker ? '#C8742A' : 'rgba(180,120,80,0.08)',
+                color: showDatePicker ? '#fff' : '#7A5030',
+                border: '1.5px solid ' + (showDatePicker ? '#C8742A' : 'rgba(180,120,80,0.2)'),
+              }}>
+              📅
+            </button>
+          </div>
+
+          {/* 日期选择器 */}
+          {showDatePicker && (
+            <div className="flex gap-2 items-center">
+              <input
+                type="date"
+                id="free-date"
+                className="flex-1 px-2.5 py-1.5 rounded-lg text-[0.75rem] focus:outline-none"
+                style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.25)', color: '#3D2517', colorScheme: 'light' }}
+              />
+              <button
+                onClick={() => {
+                  const dateVal = document.getElementById('free-date').value
+                  if (dateVal && newText.trim()) handleAdd(dateVal)
+                }}
+                disabled={!newText.trim()}
+                className="px-3 py-1.5 rounded-lg text-[0.75rem] font-medium text-white transition-all"
+                style={{ backgroundColor: newText.trim() ? ACCENT : '#ccc', cursor: newText.trim() ? 'pointer' : 'not-allowed' }}>
+                添加
+              </button>
             </div>
           )}
-          {inboxTodos.map(todo => (
-            <div key={todo.id} className="flex items-start gap-2.5 p-3 rounded-xl" style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(180,120,80,0.2)' }}>
-              <button
-                onClick={() => onToggle(todo.id)}
-                className="flex-shrink-0 w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center transition-all"
-                style={{ borderColor: todo.done ? ACCENT : '#7A5030', backgroundColor: todo.done ? ACCENT : 'transparent' }}
-              >
-                {todo.done && <Check size={10} className="text-white" />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-[0.8125rem] leading-snug" style={{ color: todo.done ? '#7A5030' : '#3D2517', textDecoration: todo.done ? 'line-through' : 'none' }}>
-                  {todo.text}
-                </p>
-                {todo.deadline !== 'inbox' && (
-                  <span className="text-[0.7rem] mt-0.5 inline-block px-1.5 py-0.5 rounded" style={{ color: '#C8742A', backgroundColor: 'rgba(200,116,42,0.1)' }}>
-                    {todo.deadline}
-                  </span>
-                )}
+
+          <div className="text-[0.6rem] text-center" style={{ color: '#B0A090' }}>
+            输入内容后点击日期分配，或直接 Enter 发到收集箱
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-4">
+          {/* 今日待办（置顶，金色文字，紧凑行） */}
+          {todayItems.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[0.75rem]">📌</span>
+                <span className="text-[0.75rem] font-semibold" style={{ color: '#C8742A' }}>今日待办</span>
+                <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'rgba(200,116,42,0.15)', color: '#C8742A' }}>
+                  {todayItems.filter(t => !t.done).length} 待办
+                </span>
               </div>
-              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100">
-                <button onClick={() => onMoveToday(todo.id)} className="p-1 transition-colors text-[0.7rem]" style={{color:'#888888'}} onMouseEnter={e=>e.currentTarget.style.color='#3D2517'} onMouseLeave={e=>e.currentTarget.style.color='#7A5030'}>→ 今日</button>
-                <button onClick={() => onDelete(todo.id)} className="p-1 transition-colors text-[0.7rem]" style={{color:'#888888'}} onMouseEnter={e=>e.currentTarget.style.color='#DC2626'} onMouseLeave={e=>e.currentTarget.style.color='#7A5030'}>删除</button>
+              <div className="space-y-1">
+                {todayItems.map(t => <CompactItem key={t.id} t={t} onToggle={onToggle} gold={true} />)}
+              </div>
+            </div>
+          )}
+
+          {/* 收集箱（deadline=inbox） */}
+          <div>
+            <SectionLabel emoji="📥" label="收集箱" count={inboxItems.length + inboxTodayItems.length} orange={false} />
+
+            {/* 收集箱内带 today_badge 的任务（置顶，带今天徽章） */}
+            {inboxTodayItems.length > 0 && (
+              <div className="mb-2">
+                {inboxTodayItems.map(t => (
+                  <ItemCard key={t.id} t={t} showDate={false} isInboxToday={true} />
+                ))}
+              </div>
+            )}
+
+            {inboxItems.length === 0 && scheduledItems.length === 0 && todayItems.length === 0 && inboxTodayItems.length === 0 ? (
+              <div className="text-center py-8 rounded-xl" style={{ backgroundColor: 'rgba(200,116,42,0.04)', border: '1px dashed rgba(200,116,42,0.18)' }}>
+                <Inbox size={22} style={{ color: '#D4C4B0', margin: '0 auto 6px' }} />
+                <div className="text-[0.75rem]" style={{ color: '#C4B4A0' }}>空空的</div>
+                <div className="text-[0.65rem] mt-0.5" style={{ color: '#D4C4B0' }}>记下来，然后分配日期</div>
+              </div>
+            ) : inboxItems.length === 0 ? null : (
+              <div className="space-y-1.5">
+                {inboxItems.map(t => <ItemCard key={t.id} t={t} showDate={false} isInboxToday={false} />)}
+              </div>
+            )}
+          </div>
+
+          {/* 已排期（未来7天内，非today） */}
+          {scheduledItems.length > 0 && (
+            <div>
+              <SectionLabel emoji="📆" label={`近期 ${scheduledItems.length}`} count={scheduledItems.length} orange={false} />
+              <div className="space-y-1.5">
+                {scheduledItems.map(t => <ItemCard key={t.id} t={t} showDate={true} isInboxToday={false} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── 四象限视图 ───
+function InboxMatrixView({ inboxTodos, matrixTags, onToggle, onMoveToday, onDelete, toggleTag }) {
+  const q1 = inboxTodos.filter(t => matrixTags[t.id]?.important && matrixTags[t.id]?.urgent)
+  const q2 = inboxTodos.filter(t => matrixTags[t.id]?.important && !matrixTags[t.id]?.urgent)
+  const q3 = inboxTodos.filter(t => !matrixTags[t.id]?.important && matrixTags[t.id]?.urgent)
+  const q4 = inboxTodos.filter(t => !matrixTags[t.id]?.important && !matrixTags[t.id]?.urgent)
+
+  const quadrants = [
+    { items: q1, label: '重要且紧急', color: '#DC2626', bg: 'rgba(220,38,38,0.06)', border: 'rgba(220,38,38,0.2)' },
+    { items: q2, label: '重要不紧急', color: '#7C3AED', bg: 'rgba(124,58,237,0.06)', border: 'rgba(124,58,237,0.2)' },
+    { items: q3, label: '紧急不重要', color: '#D97706', bg: 'rgba(217,119,6,0.06)', border: 'rgba(217,119,6,0.2)' },
+    { items: q4, label: '既不重要也不紧急', color: '#9CA3AF', bg: 'rgba(156,163,175,0.06)', border: 'rgba(156,163,175,0.15)' },
+  ]
+
+  function ItemChip({ t }) {
+    const imp = matrixTags[t.id]?.important
+    const urg = matrixTags[t.id]?.urgent
+    return (
+      <div className="p-2 rounded-lg" style={{ backgroundColor: '#FFFBF5', border: '1px solid rgba(0,0,0,0.06)' }}>
+        <p className="text-[0.8rem] leading-snug mb-2" style={{ color: '#3D2517' }}>{t.text}</p>
+        <div className="flex items-center gap-1 flex-wrap">
+          <button onClick={() => toggleTag(t.id, 'important')}
+            className="text-[0.65rem] px-2 py-0.5 rounded-full font-medium transition-all"
+            style={{ backgroundColor: imp ? '#7C3AED' : 'rgba(124,58,237,0.1)', color: imp ? '#fff' : '#7C3AED' }}>
+            ★ 重要
+          </button>
+          <button onClick={() => toggleTag(t.id, 'urgent')}
+            className="text-[0.65rem] px-2 py-0.5 rounded-full font-medium transition-all"
+            style={{ backgroundColor: urg ? '#DC2626' : 'rgba(220,38,38,0.1)', color: urg ? '#fff' : '#DC2626' }}>
+            ⚡ 紧急
+          </button>
+          <button onClick={() => onMoveToday(t.id)} className="ml-auto text-[0.65rem] px-2 py-0.5 rounded-full" style={{ color: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)' }}>→今</button>
+          <button onClick={() => onDelete(t.id)} className="text-[0.65rem] px-2 py-0.5 rounded-full" style={{ color: '#DC2626', backgroundColor: 'rgba(220,38,38,0.06)' }}>×</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* 列标签 */}
+      <div className="flex mb-2 pl-16">
+        <span className="flex-1 text-center text-[0.65rem] font-semibold" style={{color:'#DC2626'}}>⚡ 紧急</span>
+        <span className="flex-1 text-center text-[0.65rem] font-semibold" style={{color:'#9CA3AF'}}>☁️ 不急</span>
+      </div>
+      <div className="flex gap-2 flex-1 min-h-0">
+        {/* 左列：重要 */}
+        <div className="flex-1 flex flex-col gap-2 min-h-0">
+          {quadrants.slice(0, 2).map(q => (
+            <div key={q.label} className="flex-1 rounded-xl p-2.5 flex flex-col min-h-0" style={{ backgroundColor: q.bg, border: '1px solid ' + q.border }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.7rem] font-semibold" style={{color: q.color}}>{q.label}</span>
+                <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-bold" style={{color:'#fff', backgroundColor: q.color}}>{q.items.length}</span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-1.5">
+                {q.items.length === 0 && <p className="text-[0.65rem] text-center py-2" style={{color:'#ccc'}}>—</p>}
+                {q.items.map(t => <ItemChip key={t.id} t={t} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* 右列：不重要 */}
+        <div className="flex-1 flex flex-col gap-2 min-h-0">
+          {quadrants.slice(2, 4).map(q => (
+            <div key={q.label} className="flex-1 rounded-xl p-2.5 flex flex-col min-h-0" style={{ backgroundColor: q.bg, border: '1px solid ' + q.border }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.7rem] font-semibold" style={{color: q.color}}>{q.label}</span>
+                <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-bold" style={{color:'#fff', backgroundColor: q.color}}>{q.items.length}</span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-1.5">
+                {q.items.length === 0 && <p className="text-[0.65rem] text-center py-2" style={{color:'#ccc'}}>—</p>}
+                {q.items.map(t => <ItemChip key={t.id} t={t} />)}
               </div>
             </div>
           ))}
         </div>
       </div>
-    </>
+      {/* 行标签 */}
+      <div className="flex mt-2 pl-16">
+        <span className="flex-1 text-center text-[0.65rem] font-semibold" style={{color:'#7C3AED'}}>★ 重要</span>
+        <span className="flex-1 text-center text-[0.65rem] font-semibold" style={{color:'#9CA3AF'}}>○ 不重要</span>
+      </div>
+      {/* 快捷标记 */}
+      {inboxTodos.length > 0 && (
+        <div className="flex gap-2 mt-2">
+          <button onClick={() => inboxTodos.forEach(t => !matrixTags[t.id]?.important && toggleTag(t.id,'important'))}
+            className="text-[0.7rem] px-3 py-1 rounded-full font-medium" style={{backgroundColor:'rgba(124,58,237,0.1)',color:'#7C3AED'}}>
+            全部标★重要
+          </button>
+          <button onClick={() => inboxTodos.forEach(t => !matrixTags[t.id]?.urgent && toggleTag(t.id,'urgent'))}
+            className="text-[0.7rem] px-3 py-1 rounded-full font-medium" style={{backgroundColor:'rgba(220,38,38,0.1)',color:'#DC2626'}}>
+            全部标⚡紧急
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 四象限弹窗 ───
+function MatrixModal({ open, onClose, todos, matrixTags, setMatrixTags, onToggle, onMoveToday, onDelete }) {
+  const inboxTodos = todos.filter(t => t.deadline === 'inbox')
+
+  function toggleTag(id, type) {
+    setMatrixTags(prev => ({ ...prev, [id]: { ...prev[id], [type]: !prev[id]?.[type] } }))
+  }
+
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-[92vw] max-w-4xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+        style={{ backgroundColor: '#FFF9F4', border: '1px solid rgba(180,120,80,0.2)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 弹窗标题栏 */}
+        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(180,120,80,0.2)' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-[1rem] font-bold" style={{color:'#3D2517'}}>收集箱 · 四象限</span>
+            <span className="text-[0.75rem] px-2 py-0.5 rounded-full" style={{color:'#7A5030',backgroundColor:'rgba(180,120,80,0.1)'}}>{inboxTodos.length} 条</span>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl transition-colors" style={{ color: '#7A5030', backgroundColor: 'rgba(180,120,80,0.1)' }}
+            onMouseEnter={e=>{e.currentTarget.style.color='#fff';e.currentTarget.style.backgroundColor='#7C3AED'}}
+            onMouseLeave={e=>{e.currentTarget.style.color='#7A5030';e.currentTarget.style.backgroundColor='rgba(180,120,80,0.1)'}}>
+            <X size={18} />
+          </button>
+        </div>
+        {/* 四象限内容 */}
+        <div className="flex-1 p-4 min-h-0">
+          <InboxMatrixView
+            inboxTodos={inboxTodos}
+            matrixTags={matrixTags}
+            onToggle={onToggle}
+            onMoveToday={onMoveToday}
+            onDelete={onDelete}
+            toggleTag={toggleTag}
+          />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -786,6 +1150,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [editingPlan, setEditingPlan] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
+  const [matrixModalOpen, setMatrixModalOpen] = useState(false)
+  const [matrixTags, setMatrixTags] = useState({})
   const [reviewOpen, setReviewOpen] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [newProject, setNewProject] = useState({ name: '', emoji: '📁' })
@@ -916,12 +1282,13 @@ export default function App() {
     } catch (e) { console.error(e) }
   }
 
-  async function handleMoveToday(id) {
+  async function handleMoveToday(id, extras = {}) {
     const todo = todos.find(t => t.id === id)
     if (!todo) return
     try {
-      await apiPut(`/todos/${id}`, { ...todo, deadline: 'today' })
-      setTodos(todos.map(t => t.id === id ? { ...t, deadline: 'today' } : t))
+      const updates = { ...todo, deadline: 'today', ...extras }
+      await apiPut(`/todos/${id}`, updates)
+      setTodos(todos.map(t => t.id === id ? { ...t, deadline: 'today', ...extras } : t))
     } catch (e) { console.error(e) }
   }
 
@@ -1172,6 +1539,17 @@ export default function App() {
         onClose={() => setInboxOpen(false)}
         todos={todos}
         onAdd={handleAddFromInbox}
+        onToggle={handleToggleTodo}
+        onMoveToday={handleMoveToday}
+        onDelete={handleDeleteTodo}
+        onOpenMatrix={() => setMatrixModalOpen(true)}
+      />
+      <MatrixModal
+        open={matrixModalOpen}
+        onClose={() => setMatrixModalOpen(false)}
+        todos={todos}
+        matrixTags={matrixTags}
+        setMatrixTags={setMatrixTags}
         onToggle={handleToggleTodo}
         onMoveToday={handleMoveToday}
         onDelete={handleDeleteTodo}
