@@ -770,28 +770,34 @@ function ReviewSidebar({ open, onClose }) {
     if (open) loadData(reviewDate)
   }, [open, reviewDate])
 
+  // 用户是否真正编辑过（防止首次加载空内容触发 auto-save）
+  const isModifiedRef = useRef(false)
+
   async function handleSave(silent = false) {
     if (!silent) setSaving(true)
     try {
       // 使用 ref 获取最新的 reviewDate，避免闭包问题
       await apiPut(`/reviews/${reviewDateRef.current}`, { content, tomorrow_plan: tomorrowPlan, mood, energy, tags })
       await loadData(reviewDateRef.current)
+      isModifiedRef.current = false  // 保存后重置标记
       if (!silent) alert('复盘已保存 ✓')
       setLastSaved(new Date())
     } catch (e) { console.error(e) } finally { if (!silent) setSaving(false) }
   }
 
   // Auto-save on change (debounced 1.5s)
+  // 注意：reviewDate 不在依赖里！切换日期时不应该触发 auto-save，否则会覆盖新日期的旧数据
+  // isModifiedRef 防止首次加载空内容时误触发 auto-save
   useEffect(() => {
-    if (!reviewDate) return
+    if (!isModifiedRef.current) return  // 用户还没编辑过，不保存
     const timer = setTimeout(() => {
       handleSave(true)
     }, 1500)
     return () => clearTimeout(timer)
-  }, [content, tomorrowPlan, mood, energy, tags, reviewDate])
+  }, [content, tomorrowPlan, mood, energy, tags])
 
   function addTag(t) {
-    if (t && !tags.includes(t)) setTags([...tags, t])
+    if (t && !tags.includes(t)) { setTags([...tags, t]); isModifiedRef.current = true }
   }
 
   function shiftDate(ds, delta) {
@@ -892,7 +898,7 @@ function ReviewSidebar({ open, onClose }) {
             <textarea
               ref={contentRef}
               value={content}
-              onChange={e => setContent(e.target.value)}
+              onChange={e => { setContent(e.target.value); isModifiedRef.current = true }}
               placeholder="今天做了什么？有哪些收获？"
               rows={1}
               className="w-full px-3 py-2 rounded-xl text-[0.875rem] focus:outline-none overflow-hidden"
@@ -900,13 +906,13 @@ function ReviewSidebar({ open, onClose }) {
             />
           </div>
 
-          {/* 明日计划 */}
+          {/* 笔记 */}
           <div>
-            <div className="text-[0.7rem] font-semibold uppercase tracking-wide mb-2" style={{ color: '#7A5030' }}>🚀 明日计划</div>
+            <div className="text-[0.7rem] font-semibold uppercase tracking-wide mb-2" style={{ color: '#7A5030' }}>📝 笔记</div>
             <textarea
               ref={planRef}
               value={tomorrowPlan}
-              onChange={e => setTomorrowPlan(e.target.value)}
+              onChange={e => { setTomorrowPlan(e.target.value); isModifiedRef.current = true }}
               placeholder="明天要做什么？"
               rows={1}
               className="w-full px-3 py-2 rounded-xl text-[0.875rem] focus:outline-none overflow-hidden"
@@ -923,7 +929,7 @@ function ReviewSidebar({ open, onClose }) {
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                 <button key={n}
-                  onClick={() => setMood(n)}
+                  onClick={() => { setMood(n); isModifiedRef.current = true }}
                   className="flex-1 aspect-square rounded-lg text-[0.75rem] font-medium transition-all"
                   style={{
                     backgroundColor: mood >= n ? moodColor(mood) : '#FFFBF5',
@@ -945,7 +951,7 @@ function ReviewSidebar({ open, onClose }) {
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                 <button key={n}
-                  onClick={() => setEnergy(n)}
+                  onClick={() => { setEnergy(n); isModifiedRef.current = true }}
                   className="flex-1 aspect-square rounded-lg text-[0.75rem] font-medium transition-all"
                   style={{
                     backgroundColor: energy >= n ? energyColor(energy) : '#FFFBF5',
@@ -969,7 +975,7 @@ function ReviewSidebar({ open, onClose }) {
                 <span key={tag} className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.75rem] font-medium"
                   style={{ backgroundColor: 'rgba(200,116,42,0.15)', color: ACCENT }}>
                   {tag}
-                  <button onClick={() => setTags(tags.filter(t => t !== tag))}
+                  <button onClick={() => { setTags(tags.filter(t => t !== tag)); isModifiedRef.current = true }}
                     className="ml-0.5 opacity-60 hover:opacity-100">×</button>
                 </span>
               ))}
@@ -983,7 +989,7 @@ function ReviewSidebar({ open, onClose }) {
                     setTagInput('')
                   }
                   if (e.key === 'Backspace' && !tagInput && tags.length) {
-                    setTags(tags.slice(0, -1))
+                    setTags(tags.slice(0, -1)); isModifiedRef.current = true
                   }
                 }}
                 placeholder="输入标签，回车添加..."
