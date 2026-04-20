@@ -1140,7 +1140,7 @@ def get_market_records():
     query = session.query(MarketRecord)
     if stock_id:
         query = query.filter_by(stock_id=stock_id)
-    records = query.order_by(MarketRecord.date.desc()).all()
+    records = query.order_by(MarketRecord.date.desc(), MarketRecord.created_at.desc()).all()
     result = [{
         'id': r.id,
         'stock_id': r.stock_id,

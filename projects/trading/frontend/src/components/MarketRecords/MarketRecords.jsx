@@ -189,6 +189,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
     return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' })
   }
 
+  // 按颜色排序分组
   const stocksByGroup = {}
   stocks.forEach(stock => {
     const groupId = stock.logic_group_id || 'ungrouped'
@@ -198,6 +199,11 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
       stocksByGroup[groupId] = { name: groupName, color: groupColor, stocks: [] }
     }
     stocksByGroup[groupId].stocks.push(stock)
+  })
+  const sortedGroupEntries = Object.entries(stocksByGroup).sort((a, b) => {
+    const colorA = a[1].color || '#6b7280'
+    const colorB = b[1].color || '#6b7280'
+    return colorB.localeCompare(colorA)
   })
 
   const selectedStock = stocks.find(s => s.id === selectedStockId)
@@ -255,7 +261,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           >
             全部
           </button>
-          {Object.entries(stocksByGroup).map(([groupId, group]) => {
+          {sortedGroupEntries.map(([groupId, group]) => {
             const isSelected = selectedGroupId === (groupId === 'ungrouped' ? null : parseInt(groupId))
             return (
               <button

@@ -33,7 +33,9 @@ export default function LogicGroupList() {
     try {
       const res = await fetch(`${API}/logic-groups`)
       const data = await res.json()
-      setGroups(data)
+      // 按颜色排序
+      const sorted = [...data].sort((a, b) => (b.color || '').localeCompare(a.color || ''))
+      setGroups(sorted)
     } catch (err) {
       console.error('Failed to fetch groups:', err)
     }
