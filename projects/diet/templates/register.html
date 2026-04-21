@@ -194,7 +194,7 @@
                 
                 if (data.success) {
                     showToast('✨ 注册成功！');
-                    setTimeout(() => window.location.href = '/', 500);
+                    setTimeout(() => window.location.href = '/diet/', 500);
                 } else {
                     showToast(data.message || '注册失败');
                     btn.disabled = false;

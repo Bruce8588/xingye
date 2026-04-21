@@ -176,7 +176,7 @@
                 
                 if (data.success) {
                     showToast('✨ 登录成功！');
-                    setTimeout(() => window.location.href = '/', 500);
+                    setTimeout(() => window.location.href = '/diet/', 500);
                 } else {
                     showToast(data.message || '登录失败');
                     btn.disabled = false;
